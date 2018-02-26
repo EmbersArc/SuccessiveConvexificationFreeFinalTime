@@ -60,13 +60,7 @@ for k in range(0, Kn - 1):
 
 # END INITIALIZATION----------------------------------------------------------------------------------------------------
 
-
-# X[0, k + 1, :] = np.matmul(A_bar, X[0, k, :]) + np.matmul(B_bar, U[0, k, :]) + \
-#                  np.matmul(C_bar, U[0, k + 1, :]) + Sigma_bar * sigma + z_bar
-
-
 # START SUCCESSIVE CONVEXIFICATION--------------------------------------------------------------------------------------
-
 
 P = pic.Problem()
 
@@ -83,9 +77,8 @@ x_ = P.add_variable('x', (Kn, 14))
 u_ = P.add_variable('u', (Kn, 3))
 sigma_ = P.add_variable('sigma', 1)
 delta_ = P.add_variable('delta', Kn)
-nu_ = P.add_variable('nu', (Kn - 1, 14))
-
 delta_sigma = P.add_variable('delta_sigma', 1)
+nu_ = P.add_variable('nu', (Kn - 1, 14))
 
 # Boundary Condition
 P.add_list_of_constraints([
@@ -102,15 +95,15 @@ P.add_list_of_constraints([
 ])
 
 # State Constraints
-P.add_list_of_constraints([m_dry < x_[k][0] for k in range(Kn)])
-P.add_list_of_constraints([pic.norm(H_23 * x_[k, 1:4].T) <= x_[k, 1] / tan_gamma_gs for k in range(Kn)])
-P.add_list_of_constraints([pic.norm(H_q * x_[k, 7:11].T) <= np.sqrt((1 - cos_theta_max) / 2) for k in range(Kn)])
-P.add_list_of_constraints([pic.norm(x_[k, 11:14]) < w_B_max for k in range(Kn)])
+P.add_constraint(m_dry <= x_[:, 0])
+P.add_list_of_constraints([abs(H_23 * x_[k, 1:4].T) <= x_[k, 1] / tan_gamma_gs for k in range(Kn)])
+P.add_list_of_constraints([abs(H_q * x_[k, 7:11].T) <= np.sqrt((1 - cos_theta_max) / 2) for k in range(Kn)])
+P.add_list_of_constraints([abs(x_[k, 11:14]) <= w_B_max for k in range(Kn)])
 
 # Control Constraints
-P.add_list_of_constraints([T_min <= u_last[k, :] / np.linalg.norm(u_last[k, :]) * u_[k] for k in range(Kn)])
-P.add_list_of_constraints([pic.norm(u_[k]) <= T_max for k in range(Kn)])
-P.add_list_of_constraints([pic.norm(u_[k]) <= u_[k][0] / cos_delta_max for k in range(Kn)])
+P.add_list_of_constraints([T_min <= u_last[k, :].T / np.linalg.norm(u_last[k, :]) * u_[k, :] for k in range(Kn)])
+P.add_list_of_constraints([pic.norm(u_[k, :]) <= T_max for k in range(Kn)])
+P.add_list_of_constraints([pic.norm(u_[k, :]) <= u_[k, 0] / cos_delta_max for k in range(Kn)])
 
 # Dynamics
 P.add_list_of_constraints([
@@ -122,19 +115,21 @@ P.add_list_of_constraints([
 ])
 
 # Trust Regions
-dx = [(x_[k, :] - x_last[k, :])|(x_[k, :] - x_last[k, :]) for k in range(Kn)]
-du = [(u_[k, :] - u_last[k, :])|(u_[k, :] - u_last[k, :]) for k in range(Kn)]
-
 P.add_list_of_constraints([
-    dx[k] + du[k] <= delta_[k] for k in range(Kn)
+    abs(x_[k, :] - x_last[k, :])**2 + abs(u_[k, :] - u_last[k, :])**2 <= delta_[k] for k in range(Kn)
 ])
 P.add_constraint(abs(sigma_ - sigma_last) <= delta_sigma)
+# P.convert_quad_to_socp()
 
 # Cost Function
-print(P)
-objective = sigma_ + abs(w_delta * delta_) + abs(w_delta_sigma * delta_sigma) + pic.sum(w_nu * nu_)
+nu_sum = pic.sum([1 | nu_[k, :] for k in range(Kn - 1)])
+
+objective = sigma_ + w_nu * nu_sum + w_delta * abs(delta_) ** 2 + w_delta_sigma * delta_sigma
 P.set_objective('min', objective)
 P.solver_selection()
+print(P)
+
+
 P.solve(verbose=True)
 
 # for i in range(1, iterations):
