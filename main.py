@@ -32,7 +32,6 @@ sigma = t_f_guess
 x_init = X[0, :]
 
 print("Initialization finished.")
-
 # END INITIALIZATION----------------------------------------------------------------------------------------------------
 
 # START SUCCESSIVE CONVEXIFICATION--------------------------------------------------------------------------------------
@@ -42,6 +41,8 @@ for it in range(iterations):
     C_bar = np.zeros([K, 14, 3])
     Sigma_bar = np.zeros([K, 14])
     z_bar = np.zeros([K, 14])
+
+    print("Calculating new transition matrices.")
 
     for k in range(0, K - 1):
         tk = k / (K - 1)
@@ -68,6 +69,7 @@ for it in range(iterations):
         Sigma_bar[k, :] *= (tk_1 - tk) / res
         z_bar[k, :] *= (tk_1 - tk) / res
 
+    print("Sending problem to CVX.")
     # array passing very slow
     X_sol, U_sol, s_sol, done = eng.solve_socp(toml(A_bar), toml(B_bar), toml(C_bar), toml(Sigma_bar), toml(z_bar),
                                                toml(X), toml(U), sigma, toml(x_init), K, nargout=4)
@@ -79,4 +81,3 @@ for it in range(iterations):
     X = np.asarray(X_sol)
     U = np.asarray(U_sol)
     sigma = s_sol
-

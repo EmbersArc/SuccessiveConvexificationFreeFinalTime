@@ -82,8 +82,8 @@ cvx_end
 x = X;
 u = U;
 s = sig;
-norm(delta, 2)
-norm(nu, 1)
+delta_cost = norm(delta, 2)
+nu_cost = norm(nu, 1)
 d = (norm(delta, 2) < delta_tol) && (norm(nu, 1) < nu_tol)
 
 
