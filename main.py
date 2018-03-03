@@ -1,12 +1,13 @@
 from parameters import *
 import matlab.engine
 
+print("Starting Matlab.")
 eng = matlab.engine.start_matlab()
 
 
 # convert numpy array to matlab matrix
 def toml(A):
-    return matlab.double(A.tolist())
+    return matlab.double(A)
 
 
 X = np.empty(shape=[K, 14])
@@ -30,44 +31,52 @@ for k in range(K):
 sigma = t_f_guess
 x_init = X[0, :]
 
-A_bar = np.zeros([K, 14, 14])
-B_bar = np.zeros([K, 14, 3])
-C_bar = np.zeros([K, 14, 3])
-Sigma_bar = np.zeros([K, 14])
-z_bar = np.zeros([K, 14])
-
-for k in range(0, K - 1):
-    tk = k / (K - 1)
-    tk_1 = (k + 1) / (K - 1)
-
-    A_bar[k, :, :] = np.eye(14) + A(X[k, :], U[k, :], sigma) * (tk_1 - tk)
-
-    res = 100
-    for i in range(res):
-        xi = tk + i / res * (tk_1 - tk)
-        u_t = alpha(tk_1, xi, tk) * U[k, :] + beta(tk_1, xi, tk) * U[k + 1, :]
-        Phi_xi = np.eye(14) + A(X[k, :], U[k, :], sigma) * (xi - tk)  # matrix exponential approximation
-
-        B_bar[k, :, :] += np.matmul(Phi_xi, B(X[k, :], u_t, sigma)) * alpha(tk_1, xi, tk)
-
-        C_bar[k, :, :] += np.matmul(Phi_xi, B(X[k, :], u_t, sigma)) * beta(tk_1, xi, tk)
-
-        Sigma_bar[k, :] += np.matmul(Phi_xi, f(X[k, :], u_t))
-
-        z_bar[k, :] += np.matmul(Phi_xi, - np.matmul(A(X[k, :], u_t, sigma), X[k, :])
-                                 - np.matmul(B(X[k, :], u_t, sigma), U[k, :]))
-
-    B_bar[k, :, :] *= (tk_1 - tk) / res
-    C_bar[k, :, :] *= (tk_1 - tk) / res
-    Sigma_bar[k, :] *= (tk_1 - tk) / res
-    z_bar[k, :] *= (tk_1 - tk) / res
-
 print("Initialization finished.")
 
 # END INITIALIZATION----------------------------------------------------------------------------------------------------
 
 # START SUCCESSIVE CONVEXIFICATION--------------------------------------------------------------------------------------
-# for i in range(iterations):
+for it in range(iterations):
+    A_bar = np.zeros([K, 14, 14])
+    B_bar = np.zeros([K, 14, 3])
+    C_bar = np.zeros([K, 14, 3])
+    Sigma_bar = np.zeros([K, 14])
+    z_bar = np.zeros([K, 14])
 
-sol = eng.solve_socp(toml(A_bar), toml(B_bar), toml(C_bar), toml(Sigma_bar), toml(z_bar),
-                     toml(X), toml(U), sigma, toml(x_init), K)
+    for k in range(0, K - 1):
+        tk = k / (K - 1)
+        tk_1 = (k + 1) / (K - 1)
+
+        A_bar[k, :, :] = np.eye(14) + A(X[k, :], U[k, :], sigma) * (tk_1 - tk)
+
+        for i in range(res):
+            xi = tk + i / res * (tk_1 - tk)
+            u_t = alpha(tk_1, xi, tk) * U[k, :] + beta(tk_1, xi, tk) * U[k + 1, :]
+            Phi_xi = np.eye(14) + A(X[k, :], U[k, :], sigma) * (xi - tk)  # matrix exponential approximation
+
+            B_bar[k, :, :] += np.matmul(Phi_xi, B(X[k, :], u_t, sigma)) * alpha(tk_1, xi, tk)
+
+            C_bar[k, :, :] += np.matmul(Phi_xi, B(X[k, :], u_t, sigma)) * beta(tk_1, xi, tk)
+
+            Sigma_bar[k, :] += np.matmul(Phi_xi, f(X[k, :], u_t))
+
+            z_bar[k, :] += np.matmul(Phi_xi, - np.matmul(A(X[k, :], u_t, sigma), X[k, :])
+                                     - np.matmul(B(X[k, :], u_t, sigma), U[k, :]))
+
+        B_bar[k, :, :] *= (tk_1 - tk) / res
+        C_bar[k, :, :] *= (tk_1 - tk) / res
+        Sigma_bar[k, :] *= (tk_1 - tk) / res
+        z_bar[k, :] *= (tk_1 - tk) / res
+
+    # array passing very slow
+    X_sol, U_sol, s_sol, done = eng.solve_socp(toml(A_bar), toml(B_bar), toml(C_bar), toml(Sigma_bar), toml(z_bar),
+                                               toml(X), toml(U), sigma, toml(x_init), K, nargout=4)
+
+    if done:
+        print("Done after ", it, "iterations.")
+        break
+
+    X = np.asarray(X_sol)
+    U = np.asarray(U_sol)
+    sigma = s_sol
+

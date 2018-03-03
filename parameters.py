@@ -3,6 +3,7 @@ import numpy as np
 # Trajectory points
 K = 50
 iterations = 15
+res = 100
 
 # Mass
 m_wet = 2.0
