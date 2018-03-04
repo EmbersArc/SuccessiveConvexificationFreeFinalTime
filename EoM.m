@@ -12,8 +12,6 @@ g_I = sym('g_I',[3,1]);
 r_T_B = sym('r_T_B',[3,1]);
 % inertia
 J_B = diag(sym('J_B',[3,1]));
-% time dilation
-sigma_hat = sym('sigma_hat');
 % fuel consumption rate
 alpha_m = sym('alpha_m');
 % rotation matrix from I to B
@@ -31,16 +29,3 @@ f = [m_dot; r_dot; v_dot; q_dot; w_dot];
 % linearized system
 A = jacobian(f,x);
 B = jacobian(f,u);
-
-
-
-
-
-
-
-
-
-
-
-
-

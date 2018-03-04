@@ -1,3 +1,5 @@
+import matplotlib.pyplot as plt
+from mpl_toolkits.mplot3d import Axes3D
 from parameters import *
 import matlab.engine
 
@@ -29,13 +31,14 @@ for k in range(K):
     U[k, :] = m_k * -g_I
 
 sigma = t_f_guess
-x_init = X[0, :]
+x_init = X[0, :].copy()
 
 print("Initialization finished.")
 # END INITIALIZATION----------------------------------------------------------------------------------------------------
 
 # START SUCCESSIVE CONVEXIFICATION--------------------------------------------------------------------------------------
-for it in range(iterations):
+for it in range(5):
+    print("Iteration", it)
     A_bar = np.zeros([K, 14, 14])
     B_bar = np.zeros([K, 14, 3])
     C_bar = np.zeros([K, 14, 3])
@@ -44,30 +47,33 @@ for it in range(iterations):
 
     print("Calculating new transition matrices.")
 
+    dt = 1 / (K - 1)
     for k in range(0, K - 1):
         tk = k / (K - 1)
-        tk_1 = (k + 1) / (K - 1)
 
-        A_bar[k, :, :] = np.eye(14) + A(X[k, :], U[k, :], sigma) * (tk_1 - tk)
-
+        A_bar[k, :, :] = np.eye(14) + A(X[k, :], U[k, :], sigma) * dt
+        # x_t = X[k, :].copy()
         for i in range(res):
-            xi = tk + i / res * (tk_1 - tk)
-            u_t = alpha(tk_1, xi, tk) * U[k, :] + beta(tk_1, xi, tk) * U[k + 1, :]
-            Phi_xi = np.eye(14) + A(X[k, :], U[k, :], sigma) * (xi - tk)  # matrix exponential approximation
+            xi = tk + i / res * dt
+            a_k = (tk + dt - xi) / dt
+            b_k = (xi - tk) / dt
+            u_t = a_k * U[k, :] + b_k * U[k + 1, :]
+            # x_t += f(x_t, u_t) * dt
+            Phi_xi = np.eye(14) + A(X[k, :], u_t, sigma) * (xi - tk)  # matrix exponential approximation
 
-            B_bar[k, :, :] += np.matmul(Phi_xi, B(X[k, :], u_t, sigma)) * alpha(tk_1, xi, tk)
+            B_bar[k, :, :] += np.matmul(Phi_xi, B(X[k, :], u_t, sigma)) * a_k
 
-            C_bar[k, :, :] += np.matmul(Phi_xi, B(X[k, :], u_t, sigma)) * beta(tk_1, xi, tk)
+            C_bar[k, :, :] += np.matmul(Phi_xi, B(X[k, :], u_t, sigma)) * b_k
 
             Sigma_bar[k, :] += np.matmul(Phi_xi, f(X[k, :], u_t))
 
             z_bar[k, :] += np.matmul(Phi_xi, - np.matmul(A(X[k, :], u_t, sigma), X[k, :])
-                                     - np.matmul(B(X[k, :], u_t, sigma), U[k, :]))
+                                     - np.matmul(B(X[k, :], u_t, sigma), u_t))
 
-        B_bar[k, :, :] *= (tk_1 - tk) / res
-        C_bar[k, :, :] *= (tk_1 - tk) / res
-        Sigma_bar[k, :] *= (tk_1 - tk) / res
-        z_bar[k, :] *= (tk_1 - tk) / res
+        B_bar[k, :, :] *= dt / res
+        C_bar[k, :, :] *= dt / res
+        Sigma_bar[k, :] *= dt / res
+        z_bar[k, :] *= dt / res
 
     print("Sending problem to CVX.")
     # array passing very slow
@@ -81,3 +87,11 @@ for it in range(iterations):
     X = np.asarray(X_sol)
     U = np.asarray(U_sol)
     sigma = s_sol
+
+fig = plt.figure()
+ax = fig.add_subplot(111, projection='3d')
+ax.plot(X[:, 1], X[:, 2], X[:, 3], zdir='x')
+ax.set_xlim(-5, 5)
+ax.set_ylim(-5, 5)
+ax.set_zlim(0, 5)
+plt.show()

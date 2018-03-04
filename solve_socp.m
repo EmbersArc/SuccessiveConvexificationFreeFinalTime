@@ -12,7 +12,7 @@ delta_max = deg2rad(20);
 theta_max = deg2rad(90);
 w_max = deg2rad(60);
 m_dry = 1;
-T_min = 0;
+T_min = 0.3;
 T_max = 5;
 
 disp("Setting up constraints.")
@@ -33,6 +33,7 @@ subject to
 X(1, 1) == x_init(1);
 X(1, 2:4) == x_init(2:4);
 X(1, 5:7) == x_init(5:7);
+% X(K, 8:11) == x_init(8:11);
 X(1, 12:14) == x_init(12:14);
 
 X(K, 2:4) == 0;
@@ -51,8 +52,7 @@ end
 % State constraints:
 X(:, 1) >= m_dry;
 for k = 1:K
-    tan(gamma_gs) * norm([X(k, 3) X(k, 4)], 2) <= X(k, 2);
-%     cos(theta_max) <= 1 - 2 * (X(k, 9)^2 + X(k, 10)^2);
+    tan(gamma_gs) * norm(X(k, 3:4), 2) <= X(k, 2);
     norm(X(k, 9:10)) <= sqrt((1-cos(theta_max))/2);
     norm(X(k, 12:14), 2) <= w_max;
 end
