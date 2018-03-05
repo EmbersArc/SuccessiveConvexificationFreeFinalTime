@@ -12,7 +12,7 @@ delta_max = deg2rad(20);
 theta_max = deg2rad(90);
 w_max = deg2rad(60);
 m_dry = 1;
-T_min = 0.3;
+T_min = 0;
 T_max = 5;
 
 disp("Setting up constraints.")

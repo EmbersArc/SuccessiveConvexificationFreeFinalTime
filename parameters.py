@@ -54,7 +54,7 @@ g_I1, g_I2, g_I3 = g_I
 T_min = 0.3
 T_max = 5.0
 
-alpha_m = 0.001
+alpha_m = 0.0000001
 
 
 # Linearized state matrices

@@ -1,9 +1,11 @@
 import matplotlib.pyplot as plt
-from mpl_toolkits.mplot3d import Axes3D
+from mpl_toolkits import mplot3d
 from parameters import *
 import matlab.engine
+from scipy.integrate import odeint
 
 print("Starting Matlab.")
+
 eng = matlab.engine.start_matlab()
 
 
@@ -34,10 +36,22 @@ sigma = t_f_guess
 x_init = X[0, :].copy()
 
 print("Initialization finished.")
+
+
 # END INITIALIZATION----------------------------------------------------------------------------------------------------
 
+def dPsidTau(Psi, i, x_hat, u_hat, sigma_hat):
+    i = int(i)
+    if i > res - 1:
+        x_interp = x_hat[res - 1, :] + (x_hat[res - 1, :] - x_hat[res - 2, :]) * (i - res)
+        u_interp = u_hat[res - 1, :] + (u_hat[res - 1, :] - u_hat[res - 2, :]) * (i - res)
+        return (A(x_interp, u_interp, sigma_hat) * Psi.reshape((14, 14))).reshape(-1)
+    else:
+        return (A(x_hat[i, :], u_hat[i, :], sigma_hat) * Psi.reshape((14, 14))).reshape(-1)
+
+
 # START SUCCESSIVE CONVEXIFICATION--------------------------------------------------------------------------------------
-for it in range(5):
+for it in range(2):
     print("Iteration", it)
     A_bar = np.zeros([K, 14, 14])
     B_bar = np.zeros([K, 14, 3])
@@ -49,26 +63,32 @@ for it in range(5):
 
     dt = 1 / (K - 1)
     for k in range(0, K - 1):
-        tk = k / (K - 1)
+        a = np.linspace(0, 1, res)
+        b = np.linspace(1, 0, res)
+        t_k = k / (K - 1)
+        x_hat = np.zeros([res, 14])
+        x_hat[0, :] = X[k, :]
+        u_hat = np.vstack((np.linspace(U[k, 0], U[k + 1, 0], res),
+                           np.linspace(U[k, 1], U[k + 1, 1], res),
+                           np.linspace(U[k, 2], U[k + 1, 2], res))).T
 
-        A_bar[k, :, :] = np.eye(14) + A(X[k, :], U[k, :], sigma) * dt
-        # x_t = X[k, :].copy()
-        for i in range(res):
-            xi = tk + i / res * dt
-            a_k = (tk + dt - xi) / dt
-            b_k = (xi - tk) / dt
-            u_t = a_k * U[k, :] + b_k * U[k + 1, :]
-            # x_t += f(x_t, u_t) * dt
-            Phi_xi = np.eye(14) + A(X[k, :], u_t, sigma) * (xi - tk)  # matrix exponential approximation
+        sigma_hat = sigma
+        for i in range(1, res):
+            x_hat[i, :] = (x_hat[i - 1, :] * res + f(x_hat[i - 1, :], u_hat[i, :]) * sigma_hat * dt) / res
 
-            B_bar[k, :, :] += np.matmul(Phi_xi, B(X[k, :], u_t, sigma)) * a_k
+        Phi = odeint(dPsidTau, np.eye(14).reshape(-1), range(res), args=(x_hat, u_hat, sigma_hat)).reshape((res, 14, 14))
 
-            C_bar[k, :, :] += np.matmul(Phi_xi, B(X[k, :], u_t, sigma)) * b_k
+        A_bar[k, :, :] = Phi[res - 1, :, :]
 
-            Sigma_bar[k, :] += np.matmul(Phi_xi, f(X[k, :], u_t))
+        for i in range(1, res):
+            B_bar[k, :, :] += np.matmul(Phi[i, :, :], B(x_hat[i, :], u_hat[i, :], sigma_hat)) * a[i]
 
-            z_bar[k, :] += np.matmul(Phi_xi, - np.matmul(A(X[k, :], u_t, sigma), X[k, :])
-                                     - np.matmul(B(X[k, :], u_t, sigma), u_t))
+            C_bar[k, :, :] += np.matmul(Phi[i, :, :], B(x_hat[i, :], u_hat[i, :], sigma_hat)) * b[i]
+
+            Sigma_bar[k, :] += np.matmul(Phi[i, :, :], f(x_hat[i, :], u_hat[i, :]))
+
+            z_bar[k, :] += np.matmul(Phi[i, :, :], - np.matmul(A(x_hat[i, :], u_hat[i, :], sigma_hat), x_hat[i, :])
+                                     - np.matmul(B(x_hat[i, :], u_hat[i, :], sigma_hat), u_hat[i, :]))
 
         B_bar[k, :, :] *= dt / res
         C_bar[k, :, :] *= dt / res
