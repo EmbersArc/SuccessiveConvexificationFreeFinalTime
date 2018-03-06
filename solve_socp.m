@@ -12,7 +12,7 @@ delta_max = deg2rad(20);
 theta_max = deg2rad(90);
 w_max = deg2rad(60);
 m_dry = 1;
-T_min = 0;
+T_min = 0.3;
 T_max = 5;
 
 disp("Setting up constraints.")
@@ -26,7 +26,7 @@ variable nu(14 * (K-1))
 variable delta(K)
 variable delta_s
 
-minimize(sig + w_nu * norm(nu, 1) + w_delta * norm(delta, 2) + w_delta_sigma * norm(delta_s, 1))
+minimize(sig + w_nu * norm(nu, 1) + w_delta * norm(delta) + w_delta_sigma * norm(delta_s, 1))
 subject to
 
 % Boundary conditions:
@@ -46,22 +46,22 @@ U(K, 3) == 0;
 
 % Dynamics:
 for k = 1:K-1
-    X(k+1, :)' == squeeze(A(k, :, :)) * X(k, :)' + squeeze(B(k, :, :)) * U(k, :)' + squeeze(C(k, :, :)) * U(k+1, :)' + S(k, :)' * sig + z(k, :)' + nu(14 * k - 13 : 14 * k)
+    X(k + 1, :)' == squeeze(A(k, :, :)) * X(k, :)' + squeeze(B(k, :, :)) * U(k, :)' + squeeze(C(k, :, :)) * U(k + 1, :)' + S(k, :)' * sig + z(k, :)' + nu(14 * k - 13 : 14 * k)
 end
 
 % State constraints:
 X(:, 1) >= m_dry;
 for k = 1:K
-    tan(gamma_gs) * norm(X(k, 3:4), 2) <= X(k, 2);
-    norm(X(k, 9:10)) <= sqrt((1-cos(theta_max))/2);
-    norm(X(k, 12:14), 2) <= w_max;
+    tan(gamma_gs) * norm(X(k, 3:4)) <= X(k, 2);
+    cos(theta_max) <= 1 - 2 * X(k, 10:11) * X(k, 10:11)';
+    norm(X(k, 12:14)) <= w_max;
 end
 
 % Control constraints:
 for k = 1:K
-    B_g = U_last(k, :)' / norm(U_last(k, :));
-    T_min <=  B_g * U(k, :);
-    norm(U(k, :), 2) <= T_max;
+    B_g = U_last(k, :) / norm(U_last(k, :));
+    T_min <=  B_g * U(k, :)';
+    norm(U(k, :)) <= T_max;
     cos(delta_max) * norm(U(k, :)) <= U(k, 1);
 end
 
@@ -72,19 +72,19 @@ for k = 1:K
     dx * dx' + du * du' <= delta(k);
 end
 ds = sig - sigma_last;
-norm(ds, 1) <= delta_s;
+ds * ds <= delta_s;
 
 disp("Solving problem.")
 
 % -------------------------------------------------------------------------
 cvx_end
 
-x = X;
+x = full(X);
 u = U;
-s = sig;
-delta_cost = norm(delta, 2)
+s = sig
+delta_cost = norm(delta)
 nu_cost = norm(nu, 1)
-d = (norm(delta, 2) < delta_tol) && (norm(nu, 1) < nu_tol)
+d = (norm(delta) < delta_tol) && (norm(nu, 1) < nu_tol)
 
 
 end

@@ -3,6 +3,7 @@ from mpl_toolkits import mplot3d
 from parameters import *
 import matlab.engine
 from scipy.integrate import odeint
+import pickle
 
 print("Starting Matlab.")
 
@@ -40,18 +41,22 @@ print("Initialization finished.")
 
 # END INITIALIZATION----------------------------------------------------------------------------------------------------
 
-def dPsidTau(Psi, i, x_hat, u_hat, sigma_hat):
-    i = int(i)
-    if i > res - 1:
-        x_interp = x_hat[res - 1, :] + (x_hat[res - 1, :] - x_hat[res - 2, :]) * (i - res)
-        u_interp = u_hat[res - 1, :] + (u_hat[res - 1, :] - u_hat[res - 2, :]) * (i - res)
-        return (A(x_interp, u_interp, sigma_hat) * Psi.reshape((14, 14))).reshape(-1)
+def dPhidTau(Phi, t, x_hat, u_hat, sigma_hat):
+    # t is from 0 to dt
+    i = int(t / dt * (res - 1))
+
+    if i > res - 2:
+        x_interp = x_hat[res - 1, :] + (x_hat[res - 1, :] - x_hat[res - 2, :]) * (t - dt)
+        u_interp = u_hat[res - 1, :] + (u_hat[res - 1, :] - u_hat[res - 2, :]) * (t - dt)
     else:
-        return (A(x_hat[i, :], u_hat[i, :], sigma_hat) * Psi.reshape((14, 14))).reshape(-1)
+        x_interp = x_hat[i, :] + (t % (dt / (res - 1))) * (x_hat[i + 1, :] - x_hat[i, :])
+        u_interp = u_hat[i, :] + (t % (dt / (res - 1))) * (u_hat[i + 1, :] - u_hat[i, :])
+
+    return np.matmul(A(x_interp, u_interp, sigma_hat), Phi.reshape((14, 14))).reshape(-1)
 
 
 # START SUCCESSIVE CONVEXIFICATION--------------------------------------------------------------------------------------
-for it in range(2):
+for it in range(iterations):
     print("Iteration", it)
     A_bar = np.zeros([K, 14, 14])
     B_bar = np.zeros([K, 14, 3])
@@ -61,26 +66,27 @@ for it in range(2):
 
     print("Calculating new transition matrices.")
 
-    dt = 1 / (K - 1)
     for k in range(0, K - 1):
         a = np.linspace(0, 1, res)
         b = np.linspace(1, 0, res)
         t_k = k / (K - 1)
         x_hat = np.zeros([res, 14])
-        x_hat[0, :] = X[k, :]
+        x_hat[0, :] = X[k, :].copy()
         u_hat = np.vstack((np.linspace(U[k, 0], U[k + 1, 0], res),
                            np.linspace(U[k, 1], U[k + 1, 1], res),
                            np.linspace(U[k, 2], U[k + 1, 2], res))).T
 
         sigma_hat = sigma
-        for i in range(1, res):
-            x_hat[i, :] = (x_hat[i - 1, :] * res + f(x_hat[i - 1, :], u_hat[i, :]) * sigma_hat * dt) / res
+        for i in range(0, res - 1):
+            x_hat[i + 1, :] = x_hat[i, :] + f(x_hat[i, :], u_hat[i, :]) * sigma_hat * dt / (res - 1)
 
-        Phi = odeint(dPsidTau, np.eye(14).reshape(-1), range(res), args=(x_hat, u_hat, sigma_hat)).reshape((res, 14, 14))
+        Phi0 = np.eye(14).reshape(-1)
+        T = np.linspace(0, dt, res)
+        Phi = odeint(dPhidTau, Phi0, T, args=(x_hat, u_hat, sigma_hat)).reshape((res, 14, 14))
 
         A_bar[k, :, :] = Phi[res - 1, :, :]
 
-        for i in range(1, res):
+        for i in range(0, res):
             B_bar[k, :, :] += np.matmul(Phi[i, :, :], B(x_hat[i, :], u_hat[i, :], sigma_hat)) * a[i]
 
             C_bar[k, :, :] += np.matmul(Phi[i, :, :], B(x_hat[i, :], u_hat[i, :], sigma_hat)) * b[i]
@@ -108,9 +114,27 @@ for it in range(2):
     U = np.asarray(U_sol)
     sigma = s_sol
 
+FPS = int(60 / sigma)
+X_f = np.zeros([(K - 1) * FPS, 14])
+
+
+def create_ranges_nd(start, stop, N, endpoint=True):
+    if endpoint == 1:
+        divisor = N - 1
+    else:
+        divisor = N
+    steps = (1.0 / divisor) * (stop - start)
+    return start[..., None] + steps[..., None] * np.arange(N)
+
+
+for k in range(K - 1):
+    X_f[k * FPS:(k + 1) * FPS, :] = create_ranges_nd(X[k, :], X[k + 1, :], FPS).T
+
+pickle.dump(X_f, open("trajectory/X.p", "wb"))
+
 fig = plt.figure()
 ax = fig.add_subplot(111, projection='3d')
-ax.plot(X[:, 1], X[:, 2], X[:, 3], zdir='x')
+ax.plot(X_f[:, 2], X_f[:, 3], X_f[:, 1], zdir='z')
 ax.set_xlim(-5, 5)
 ax.set_ylim(-5, 5)
 ax.set_zlim(0, 5)
