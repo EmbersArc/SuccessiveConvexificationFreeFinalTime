@@ -4,42 +4,45 @@ import numpy as np
 K = 50
 dt = 1 / (K - 1)
 # Solver iterations
-iterations = 15
+iterations = 30
 # Numerical integration points
-res = 20
+res = 25
 
 # Mass
 m_wet = 2.0
 m_dry = 1.0
 
 # Flight time guess
-t_f_guess = 5.
+t_f_guess = 2.
 
 # # Weight constants
-# w_nu = 1e5
-# w_delta = 1e-3
-# w_delta_sigma = 1e-1
-#
-# # Exit conditions
-# nu_tol = 1e-10
-# delta_tol = 1e-3
+w_nu = 1e5
+w_delta = 1e-3
+w_delta_sigma = 1e-1
+
+# Exit conditions
+nu_tol = 1e-10
+delta_tol = 1e-3
 
 # State constraints
 r_I_init = np.array((4., 4., 4.))
+v_I_init = np.array((-1, -4., 0.))
+q_B_I_init = np.array((1.0, 0.0, 0.0, 0.0))
+w_B_init = np.array((0., 0., 0.))
+
 r_I_final = np.array((0., 0., 0.))
-v_I_init = np.array((-1e-1, 0., 0.))
 v_I_final = np.array((-1e-1, 0., 0.))
 q_B_I_final = np.array((1.0, 0.0, 0.0, 0.0))
-w_B_init = np.array((0., 0., 0.))
 w_B_final = np.array((0., 0., 0.))
-w_B_max = 60.
 
-# # Angles
-# cos_delta_max = np.cos(np.deg2rad(20))
-# cos_theta_max = np.cos(np.deg2rad(90))
-# tan_gamma_gs = np.tan(np.deg2rad(20))
+w_B_max = np.deg2rad(60)
 
-# Angular momentum
+# Angles
+cos_delta_max = np.cos(np.deg2rad(20))
+cos_theta_max = np.cos(np.deg2rad(90))
+tan_gamma_gs = np.tan(np.deg2rad(20))
+
+# Angular moment of inertia
 J_B_I = np.array((1e-2, 1e-2, 1e-2))
 J_B1, J_B2, J_B3 = J_B_I
 
@@ -51,11 +54,11 @@ r_T_B1, r_T_B2, r_T_B3 = r_T_B
 g_I = np.array((-1., 0., 0.))
 g_I1, g_I2, g_I3 = g_I
 
-# # Thrust limits
-# T_min = 0.3
-# T_max = 5.0
+# Thrust limits
+T_min = 1.0
+T_max = 5.0
 
-alpha_m = 0.001
+alpha_m = 0.01
 
 
 # Linearized state matrices
