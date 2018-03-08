@@ -2,18 +2,17 @@ import numpy as np
 
 # Trajectory points
 K = 50
-dt = 1 / (K - 1)
 # Solver iterations
-iterations = 30
+iterations = 15
 # Numerical integration points
-res = 25
+res = 15
 
 # Mass
 m_wet = 2.0
 m_dry = 1.0
 
 # Flight time guess
-t_f_guess = 2.
+t_f_guess = 3
 
 # # Weight constants
 w_nu = 1e5
@@ -26,7 +25,7 @@ delta_tol = 1e-3
 
 # State constraints
 r_I_init = np.array((4., 4., 4.))
-v_I_init = np.array((-1, -4., 0.))
+v_I_init = np.array((-2, -4., 0.))
 q_B_I_init = np.array((1.0, 0.0, 0.0, 0.0))
 w_B_init = np.array((0., 0., 0.))
 
@@ -58,10 +57,10 @@ g_I1, g_I2, g_I3 = g_I
 T_min = 1.0
 T_max = 5.0
 
+# Fuel consumption
 alpha_m = 0.01
 
-
-# Linearized state matrices
+# Linearized state matrices:
 
 # A Matrix
 def A(x, u, sigma_hat):

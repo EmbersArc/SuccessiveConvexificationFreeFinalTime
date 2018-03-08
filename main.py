@@ -1,7 +1,6 @@
 import matplotlib.pyplot as plt
 from mpl_toolkits import mplot3d
 from parameters import *
-from scipy.integrate import odeint
 import pickle
 import cvxpy as cvx
 
@@ -37,10 +36,10 @@ constraints = [
     X_[0, 0] == x_init[0],
     X_[0, 1:4] == x_init[1:4],
     X_[0, 4:7] == x_init[4:7],
-    # X_[0, 7:11] == x_init[7:11],
+    # X_[0, 7:11] == x_init[7:11], # initial attitude is free
     X_[0, 11:14] == x_init[11:14],
 
-    # X_[0, 0] == x_final[0],
+    # X_[0, 0] == x_final[0], # final mass is free
     X_[K - 1, 1:4] == x_final[1:4],
     X_[K - 1, 4:7] == x_final[4:7],
     X_[K - 1, 7:11] == x_final[7:11],
@@ -88,8 +87,9 @@ for k in range(K):
         cvx.sum_squares(dx) + cvx.sum_squares(du) <= delta_[k]
     ]
 ds = sigma_ - sigma_last_
-constraints += [cvx.norm(ds, 1) <= delta_s_]
+constraints += [cvx.norm(ds, 2) <= delta_s_]
 
+# Objective:
 objective = cvx.Minimize(
     sigma_ + w_nu * cvx.norm(nu_, 1) + w_delta * cvx.norm(delta_) + w_delta_sigma * cvx.norm(delta_s_, 1)
 )
@@ -113,18 +113,7 @@ for k in range(K):
     U[k, :] = m_k * -g_I
 
 print("Initialization finished.")
-
-
 # END INITIALIZATION----------------------------------------------------------------------------------------------------
-
-def dPhidTau(Phi, t, x_hat, u_hat, sigma_hat):
-    # t is from 0 to dt
-    i = int(t / dt * (res - 1))
-    ddt = dt / (res - 1)
-    x_interp = x_hat[i, :] + (t % ddt) / ddt * (x_hat[i + 1, :] - x_hat[i, :])
-    u_interp = u_hat[i, :] + (t % ddt) / ddt * (u_hat[i + 1, :] - u_hat[i, :])
-
-    return np.matmul(A(x_interp, u_interp, sigma_hat), Phi.reshape((14, 14))).reshape(-1)
 
 
 # START SUCCESSIVE CONVEXIFICATION--------------------------------------------------------------------------------------
@@ -139,64 +128,35 @@ for it in range(iterations):
     print("Calculating new transition matrices.")
 
     for k in range(0, K - 1):
-        a = np.linspace(0, 1, res)
-        b = np.linspace(1, 0, res)
-        t_k = k / (K - 1)
-        sigma_hat = sigma
-        u_hat = np.zeros((int(res * 2), 3))  # data points outside of interval for ODE solver
-        x_hat = np.zeros((len(u_hat), 14))
-        for i in range(0, len(x_hat)):
-            u_hat[i, :] = U[k, :] + (U[k + 1, :] - U[k, :]) * i / (res - 1)
+        # TODO: numerical integration
+        # find A_bar, B_bar, C_bar, Sigma_bar, z_bar
 
-        x_hat[0, :] = X[k, :]
-        for i in range(0, len(x_hat) - 1):
-            x_hat[i + 1, :] = x_hat[i, :] + f(x_hat[i, :], u_hat[i, :]) * sigma_hat * dt / (res - 1)
+        # CVX ----------------------------------------------------------------------------------------------------------
+        A_bar_.value = A_bar.reshape((K, 14 * 14), order='F')
+        B_bar_.value = B_bar.reshape((K, 14 * 3), order='F')
+        C_bar_.value = C_bar.reshape((K, 14 * 3), order='F')
+        Sigma_bar_.value = Sigma_bar
+        z_bar_.value = z_bar
+        X_last_.value = X
+        U_last_.value = U
+        sigma_last_.value = sigma
 
-        Phi0 = np.eye(14).reshape(-1)
-        T = np.linspace(dt, 0, res, endpoint=False)[::-1]
-        Phi = odeint(dPhidTau, Phi0, T, args=(x_hat, u_hat, sigma_hat)).reshape((res, 14, 14))
+        print("Solving problem.")
 
-        A_bar[k, :, :] = Phi[res - 1, :, :]
+        prob.solve(verbose=True, solver='ECOS')
+        # CVX ----------------------------------------------------------------------------------------------------------
 
-        for i in range(0, res):
-            B_bar[k, :, :] += np.matmul(Phi[i, :, :], B(x_hat[i, :], u_hat[i, :], sigma_hat)) * a[i]
+        X = X_.value
+        U = U_.value
 
-            C_bar[k, :, :] += np.matmul(Phi[i, :, :], B(x_hat[i, :], u_hat[i, :], sigma_hat)) * b[i]
-
-            Sigma_bar[k, :] += np.matmul(Phi[i, :, :], f(x_hat[i, :], u_hat[i, :]))
-
-            z_bar[k, :] += np.matmul(Phi[i, :, :], - np.matmul(A(x_hat[i, :], u_hat[i, :], sigma_hat), x_hat[i, :])
-                                     - np.matmul(B(x_hat[i, :], u_hat[i, :], sigma_hat), u_hat[i, :]))
-
-        B_bar[k, :, :] *= dt / res
-        C_bar[k, :, :] *= dt / res
-        Sigma_bar[k, :] *= dt / res
-        z_bar[k, :] *= dt / res
-
-    # CVX --------------------------------------------------------------------------------------------------------------
-    A_bar_.value = A_bar.reshape((K, 14 * 14), order='F')
-    B_bar_.value = B_bar.reshape((K, 14 * 3), order='F')
-    C_bar_.value = C_bar.reshape((K, 14 * 3), order='F')
-    Sigma_bar_.value = Sigma_bar
-    z_bar_.value = z_bar
-    X_last_.value = X
-    U_last_.value = U
-    sigma_last_.value = sigma
-
-    prob.solve(verbose=True)
-    # CVX --------------------------------------------------------------------------------------------------------------
-
-    X = X_.value
-    U = U_.value
-
-    delta_norm = np.linalg.norm(delta_.value)
-    nu_norm = np.linalg.norm(nu_.value, ord=1)
-    print("Flight time:", sigma_.value)
-    print("Delta_norm:", delta_norm)
-    print("Nu_norm:", nu_norm)
-    if delta_norm < delta_tol and nu_norm < nu_tol:
-        print("Converged after", it + 1, "iterations.")
-        break
+        delta_norm = np.linalg.norm(delta_.value)
+        nu_norm = np.linalg.norm(nu_.value, ord=1)
+        print("Flight time:", sigma_.value)
+        print("Delta_norm:", delta_norm)
+        print("Nu_norm:", nu_norm)
+        if delta_norm < delta_tol and nu_norm < nu_tol:
+            print("Converged after", it + 1, "iterations.")
+    break
 
 pickle.dump(X, open("trajectory/X.p", "wb"))
 

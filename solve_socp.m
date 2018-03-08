@@ -1,4 +1,4 @@
-function [x, u, s, d] = solve_socp(A, B, C, S, z, X_last, U_last, sigma_last, x_init, K)
+function [x, u, s, d] = solve_socp(A, B, C, S, z, X_last, U_last, sigma_last, x_init, x_final, K)
 
 w_nu = 1e5;
 w_delta = 1e-3;
@@ -36,10 +36,10 @@ X(1, 5:7) == x_init(5:7);
 % X(K, 8:11) == x_init(8:11);
 X(1, 12:14) == x_init(12:14);
 
-X(K, 2:4) == 0;
-X(K, 5:7) == [-1e-1 0 0];
-X(K, 8:11) == [1 0 0 0];
-X(K, 12:14) == 0;
+X(K, 2:4) == x_final(2:4);
+X(K, 5:7) == x_final(5:7);
+X(K, 8:11) ==  x_final(8:11);
+X(K, 12:14) ==  x_final(12:14);
 
 U(K, 2) == 0;
 U(K, 3) == 0;
@@ -72,7 +72,7 @@ for k = 1:K
     dx * dx' + du * du' <= delta(k);
 end
 ds = sig - sigma_last;
-ds * ds <= delta_s;
+norm(ds, 1) <= delta_s;
 
 disp("Solving problem.")
 
@@ -81,10 +81,14 @@ cvx_end
 
 x = full(X);
 u = U;
-s = sig
-delta_cost = norm(delta)
-nu_cost = norm(nu, 1)
-d = (norm(delta) < delta_tol) && (norm(nu, 1) < nu_tol)
+s = sig;
+delta_cost = norm(delta);
+nu_cost = norm(nu, 1);
+d = (norm(delta) < delta_tol) && (norm(nu, 1) < nu_tol);
+
+fprintf("sigma: %0.5f \n", sig)
+fprintf("delta_cost: %0.5f \n", delta_cost)
+fprintf("nu_cost: %0.5f \n", nu_cost)
 
 
 end
