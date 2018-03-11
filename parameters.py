@@ -4,9 +4,7 @@ import numpy as np
 K = 50
 dt = 1 / (K - 1)
 # Solver iterations
-iterations = 15
-# Numerical integration points
-res = 15
+iterations = 30
 
 # Mass
 m_wet = 2.0
@@ -16,7 +14,7 @@ m_dry = 1.0
 t_f_guess = 3
 
 # # Weight constants
-w_nu = 1e5
+w_nu = 1e2
 w_delta = 1e-3
 w_delta_sigma = 1e-1
 
@@ -26,7 +24,7 @@ delta_tol = 1e-3
 
 # State constraints
 r_I_init = np.array((4., 4., 4.))
-v_I_init = np.array((-2, -4., 0.))
+v_I_init = np.array((0., -4., 0.))
 q_B_I_init = np.array((1.0, 0.0, 0.0, 0.0))
 w_B_init = np.array((0., 0., 0.))
 
