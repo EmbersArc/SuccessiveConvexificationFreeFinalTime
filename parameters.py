@@ -2,6 +2,7 @@ import numpy as np
 
 # Trajectory points
 K = 50
+dt = 1 / (K - 1)
 # Solver iterations
 iterations = 15
 # Numerical integration points
@@ -59,6 +60,7 @@ T_max = 5.0
 
 # Fuel consumption
 alpha_m = 0.01
+
 
 # Linearized state matrices:
 

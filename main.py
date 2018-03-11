@@ -3,13 +3,13 @@ from mpl_toolkits import mplot3d
 from parameters import *
 import pickle
 import cvxpy as cvx
+from scipy.integrate import odeint
 
 X = np.empty(shape=[K, 14])
 U = np.empty(shape=[K, 3])
 
 x_init = np.concatenate(((m_wet,), r_I_init, v_I_init, q_B_I_init, w_B_init))
 x_final = np.concatenate(((m_dry,), r_I_final, v_I_final, q_B_I_final, w_B_final))
-sigma = t_f_guess
 
 # CVX ------------------------------------------------------------------------------------------------------------------
 print("Setting up problem.")
@@ -99,6 +99,7 @@ print("Problem is " + ("valid." if prob.is_dcp() else "invalid."))
 
 # START INITIALIZATION--------------------------------------------------------------------------------------------------
 print("Starting Initialization.")
+sigma = t_f_guess
 
 for k in range(K):
     alpha1 = (K - k) / K
@@ -113,7 +114,28 @@ for k in range(K):
     U[k, :] = m_k * -g_I
 
 print("Initialization finished.")
+
+
 # END INITIALIZATION----------------------------------------------------------------------------------------------------
+
+def ode_dVdt(V, t, u_t, u_t1, sigma):
+    # V = x(14), Phi_A(14x14), B_bar(14x3), C_bar(14x3), Simga_bar(14), z_bar(14)
+    u = u_t + t / dt * (u_t1 - u_t)
+    alpha = t / dt
+    beta = 1 - t / dt
+    dVdt = np.zeros((14 + 14 * 14 + 14 * 3 + 14 * 3 + 14 + 14,))
+    x = V[0:14]
+    Phi_A = V[14:210].reshape((14, 14))
+
+    dVdt[0:14] = sigma * f(x, u)
+    dVdt[14:210] = np.matmul(A(x, u, sigma), Phi_A).reshape(-1)
+    dVdt[210:252] = np.matmul(Phi_A, B(x, u, sigma)).reshape(-1) * alpha
+    dVdt[252:294] = np.matmul(Phi_A, B(x, u, sigma)).reshape(-1) * beta
+    dVdt[294:308] = np.matmul(Phi_A, f(x, u))
+    z_t = -np.matmul(A(x, u, sigma), x) - np.matmul(B(x, u, sigma), u)
+    dVdt[308:322] = np.matmul(Phi_A, z_t)
+
+    return dVdt
 
 
 # START SUCCESSIVE CONVEXIFICATION--------------------------------------------------------------------------------------
@@ -128,35 +150,46 @@ for it in range(iterations):
     print("Calculating new transition matrices.")
 
     for k in range(0, K - 1):
-        # TODO: numerical integration
+        # TODO: fix numerical integration
         # find A_bar, B_bar, C_bar, Sigma_bar, z_bar
+        V0 = np.zeros((322,))
+        V0[0:14] = X[k, :]
+        V0[14:210] = np.eye(14).reshape(-1)
+        V = np.array(odeint(ode_dVdt, V0.squeeze(), (0, dt), args=(U[k, :], U[k + 1, :], sigma)))
 
-        # CVX ----------------------------------------------------------------------------------------------------------
-        A_bar_.value = A_bar.reshape((K, 14 * 14), order='F')
-        B_bar_.value = B_bar.reshape((K, 14 * 3), order='F')
-        C_bar_.value = C_bar.reshape((K, 14 * 3), order='F')
-        Sigma_bar_.value = Sigma_bar
-        z_bar_.value = z_bar
-        X_last_.value = X
-        U_last_.value = U
-        sigma_last_.value = sigma
+        Phi_A = V[1, 14:210].reshape((14, 14))
+        A_bar[k, :, :] = V[1, 14:210].reshape((14, 14))
+        B_bar[k, :, :] = V[1, 210:252].reshape((14, 3))
+        C_bar[k, :, :] = V[1, 252:294].reshape((14, 3))
+        Sigma_bar[k, :] = V[1, 294:308]
+        z_bar[k, :] = V[1, 308:322]
 
-        print("Solving problem.")
+    # CVX ----------------------------------------------------------------------------------------------------------
+    A_bar_.value = A_bar.reshape((K, 14 * 14), order='F')
+    B_bar_.value = B_bar.reshape((K, 14 * 3), order='F')
+    C_bar_.value = C_bar.reshape((K, 14 * 3), order='F')
+    Sigma_bar_.value = Sigma_bar
+    z_bar_.value = z_bar
+    X_last_.value = X
+    U_last_.value = U
+    sigma_last_.value = sigma
 
-        prob.solve(verbose=True, solver='ECOS')
-        # CVX ----------------------------------------------------------------------------------------------------------
+    print("Solving problem.")
 
-        X = X_.value
-        U = U_.value
+    prob.solve(verbose=True, solver='ECOS')
+    # CVX ----------------------------------------------------------------------------------------------------------
 
-        delta_norm = np.linalg.norm(delta_.value)
-        nu_norm = np.linalg.norm(nu_.value, ord=1)
-        print("Flight time:", sigma_.value)
-        print("Delta_norm:", delta_norm)
-        print("Nu_norm:", nu_norm)
-        if delta_norm < delta_tol and nu_norm < nu_tol:
-            print("Converged after", it + 1, "iterations.")
-    break
+    X = X_.value
+    U = U_.value
+
+    delta_norm = np.linalg.norm(delta_.value)
+    nu_norm = np.linalg.norm(nu_.value, ord=1)
+    print("Flight time:", sigma_.value)
+    print("Delta_norm:", delta_norm)
+    print("Nu_norm:", nu_norm)
+    if delta_norm < delta_tol and nu_norm < nu_tol:
+        print("Converged after", it + 1, "iterations.")
+        break
 
 pickle.dump(X, open("trajectory/X.p", "wb"))
 
