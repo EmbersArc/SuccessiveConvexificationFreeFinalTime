@@ -24,8 +24,8 @@ v_dot = 1/x(1) * C_I_B * u + g_I;
 q_dot = 1/2 * omega(x(12:14)) * x(8:11);
 w_dot = J_B \ (skew(r_T_B) * u - skew(x(12:14)) * J_B * x(12:14));
 
-f = [m_dot; r_dot; v_dot; q_dot; w_dot];
+f = [m_dot; r_dot; v_dot; q_dot; w_dot]
 
 % linearized system
-A = jacobian(f,x);
-B = jacobian(f,u);
+A = jacobian(f,x)
+B = jacobian(f,u)

@@ -36,7 +36,7 @@ constraints = [
     X_[0, 0] == x_init[0],
     X_[0, 1:4] == x_init[1:4],
     X_[0, 4:7] == x_init[4:7],
-    # X_[0, 7:11] == x_init[7:11], # initial attitude is free
+    # X_[0, 7:11] == x_init[7:11],  # initial attitude is free
     X_[0, 11:14] == x_init[11:14],
 
     # X_[0, 0] == x_final[0], # final mass is free
@@ -194,6 +194,7 @@ for it in range(iterations):
 
     X = X_.value
     U = U_.value
+    sigma = sigma_.value
 
     delta_norm = np.linalg.norm(delta_.value)
     nu_norm = np.linalg.norm(nu_.value, ord=1)
@@ -205,6 +206,7 @@ for it in range(iterations):
         break
 
 pickle.dump(X, open("trajectory/X.p", "wb"))
+pickle.dump(U, open("trajectory/U.p", "wb"))
 
 fig = plt.figure()
 ax = fig.add_subplot(111, projection='3d')
