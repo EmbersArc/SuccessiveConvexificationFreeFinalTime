@@ -19,17 +19,17 @@ w_delta = 1e-3
 w_delta_sigma = 1e-1
 
 # Exit conditions
-nu_tol = 1e-10
+nu_tol = 1e-8
 delta_tol = 1e-3
 
 # State constraints
-r_I_init = np.array((4., 1., 1.))
-v_I_init = np.array((-1., -1., 0.))
+r_I_init = np.array((4., 0.5, 0.5))
+v_I_init = np.array((-2., -0.1, -0.1))
 q_B_I_init = np.array((1.0, 0.0, 0.0, 0.0))
 w_B_init = np.array((0., 0., 0.))
 
 r_I_final = np.array((0., 0., 0.))
-v_I_final = np.array((-1e-1, 0., 0.))
+v_I_final = np.array((0., 0., 0.))
 q_B_I_final = np.array((1.0, 0.0, 0.0, 0.0))
 w_B_final = np.array((0., 0., 0.))
 
