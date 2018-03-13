@@ -3,15 +3,15 @@ import numpy as np
 # Trajectory points
 K = 50
 dt = 1 / (K - 1)
-# Solver iterations
-iterations = 30
+# Max solver iterations
+iterations = 15
 
 # Mass
 m_wet = 2.0
 m_dry = 1.0
 
 # Flight time guess
-t_f_guess = 3
+t_f_guess = 4.
 
 # # Weight constants
 w_nu = 1e5
@@ -23,13 +23,13 @@ nu_tol = 1e-8
 delta_tol = 1e-3
 
 # State constraints
-r_I_init = np.array((4., 0.5, 0.5))
-v_I_init = np.array((-2., -0.1, -0.1))
+r_I_init = np.array((4., 4., 0.))
+v_I_init = np.array((0., -2., -2.))
 q_B_I_init = np.array((1.0, 0.0, 0.0, 0.0))
 w_B_init = np.array((0., 0., 0.))
 
 r_I_final = np.array((0., 0., 0.))
-v_I_final = np.array((0., 0., 0.))
+v_I_final = np.array((-1e-1, 0., 0.))
 q_B_I_final = np.array((1.0, 0.0, 0.0, 0.0))
 w_B_final = np.array((0., 0., 0.))
 
@@ -53,11 +53,11 @@ g_I = np.array((-1., 0., 0.))
 g_I1, g_I2, g_I3 = g_I
 
 # Thrust limits
-T_min = 1.0
+T_min = 0.3
 T_max = 5.0
 
 # Fuel consumption
-alpha_m = 0.01
+alpha_m = 0.02
 
 
 # Linearized state matrices:

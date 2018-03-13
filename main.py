@@ -94,10 +94,11 @@ constraints += [cvx.norm(ds, 2) <= delta_s_]
 objective = cvx.Minimize(
     sigma_ + w_nu * cvx.norm(nu_, 1) + w_delta_ * cvx.norm(delta_) + w_delta_sigma * cvx.norm(delta_s_, 1)
 )
+
 prob = cvx.Problem(objective, constraints)
+
 print("Problem is " + ("valid." if prob.is_dcp() else "invalid."))
 # CVX ------------------------------------------------------------------------------------------------------------------
-
 # START INITIALIZATION--------------------------------------------------------------------------------------------------
 print("Starting Initialization.")
 sigma = t_f_guess
@@ -187,7 +188,7 @@ for it in range(iterations):
     X_last_.value = X
     U_last_.value = U
     sigma_last_.value = sigma
-    w_delta_.value = w_delta if it < 4 else w_delta * 1e2  # for faster convergence
+    w_delta_.value = w_delta if it < 4 else w_delta * 1e3  # for faster convergence
 
     print("Solving problem.")
 
@@ -213,7 +214,7 @@ pickle.dump(U, open("trajectory/U.p", "wb"))
 fig = plt.figure()
 ax = fig.add_subplot(111, projection='3d')
 ax.plot(X[:, 2], X[:, 3], X[:, 1], zdir='z')
-ax.set_xlim(-5, 5)
-ax.set_ylim(-5, 5)
-ax.set_zlim(0, 5)
+ax.set_xlim(-r_I_init[0], r_I_init[0])
+ax.set_ylim(-r_I_init[0], r_I_init[0])
+ax.set_zlim(0, r_I_init[0])
 plt.show()
