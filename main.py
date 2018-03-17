@@ -31,6 +31,8 @@ X_last_ = cvx.Parameter((K, 14))
 U_last_ = cvx.Parameter((K, 3))
 sigma_last_ = cvx.Parameter(nonneg=True)
 w_delta_ = cvx.Parameter(nonneg=True)
+w_nu_ = cvx.Parameter(nonneg=True)
+w_delta_sigma_ = cvx.Parameter(nonneg=True)
 
 # Boundary conditions:
 constraints = [
@@ -92,7 +94,7 @@ constraints += [cvx.norm(ds, 2) <= delta_s_]
 
 # Objective:
 objective = cvx.Minimize(
-    sigma_ + w_nu * cvx.norm(nu_, 1) + w_delta_ * cvx.norm(delta_) + w_delta_sigma * cvx.norm(delta_s_, 1)
+    sigma_ + w_nu_ * cvx.norm(nu_, 1) + w_delta_ * cvx.norm(delta_) + w_delta_sigma_ * cvx.norm(delta_s_, 1)
 )
 
 prob = cvx.Problem(objective, constraints)
@@ -189,6 +191,8 @@ for it in range(iterations):
     U_last_.value = U
     sigma_last_.value = sigma
     w_delta_.value = w_delta if it < 4 else w_delta * 1e3  # for faster convergence
+    w_nu_.value = w_nu
+    w_delta_sigma_.value = w_delta_sigma
 
     print("Solving problem.")
 
