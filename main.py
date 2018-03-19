@@ -212,8 +212,8 @@ for it in range(iterations):
         print("Converged after", it + 1, "iterations.")
         break
 
-pickle.dump(X, open("trajectory/X.p", "wb"))
-pickle.dump(U, open("trajectory/U.p", "wb"))
+pickle.dump(X, open("visualization/trajectory/X.p", "wb"))
+pickle.dump(U, open("visualization/trajectory/U.p", "wb"))
 
 fig = plt.figure()
 ax = fig.add_subplot(111, projection='3d')
