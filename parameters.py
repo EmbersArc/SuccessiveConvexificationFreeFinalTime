@@ -11,7 +11,7 @@ m_wet = 2.0
 m_dry = 1.0
 
 # Flight time guess
-t_f_guess = 2.
+t_f_guess = 5.
 
 # # Weight constants
 w_nu = 1e5
@@ -23,8 +23,8 @@ nu_tol = 1e-8
 delta_tol = 1e-3
 
 # State constraints
-r_I_init = np.array((4., 0.5, 0.5))
-v_I_init = np.array((-2.5, -0.5, -0.5))
+r_I_init = np.array((15., 5., 5.))
+v_I_init = np.array((-5, -2, -2))
 q_B_I_init = np.array((1.0, 0.0, 0.0, 0.0))
 w_B_init = np.array((0., 0., 0.))
 
@@ -57,7 +57,7 @@ T_min = 2.0
 T_max = 5.0
 
 # Fuel consumption
-alpha_m = 0.02
+alpha_m = 0.01
 
 
 # Linearized state matrices:
