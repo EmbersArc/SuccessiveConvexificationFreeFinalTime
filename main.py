@@ -119,17 +119,20 @@ for k in range(K):
     U[k, :] = m_k * -g_I
 
 print("Initialization finished.")
-
-
 # END INITIALIZATION----------------------------------------------------------------------------------------------------
+
+
+# ODE function to compute dVdt
+# V = [x(14), Phi_A(14x14), B_bar(14x3), C_bar(14x3), Simga_bar(14), z_bar(14)]
 def ode_dVdt(V, t, u_t, u_t1, sigma):
-    # V = x(14), Phi_A(14x14), B_bar(14x3), C_bar(14x3), Simga_bar(14), z_bar(14)
     u = u_t + t / dt * (u_t1 - u_t)
     alpha = t / dt
     beta = 1 - t / dt
     dVdt = np.zeros((14 + 14 * 14 + 14 * 3 + 14 * 3 + 14 + 14,))
     x = V[0:14]
 
+    # using \Phi_A(\tau_{k+1},\xi) = \Phi_A(\tau_{k+1},\tau_k)\Phi_A(\xi,\tau_k)^{-1}
+    # and pre-multiplying with \Phi_A(\tau_{k+1},\tau_k) after integration
     Phi_A_xi = np.linalg.inv(V[14:210].reshape((14, 14)))
 
     dVdt[0:14] = sigma * f(x, u)
@@ -143,24 +146,30 @@ def ode_dVdt(V, t, u_t, u_t1, sigma):
     return dVdt
 
 
+A_bar = np.zeros([K, 14, 14])
+B_bar = np.zeros([K, 14, 3])
+C_bar = np.zeros([K, 14, 3])
+Sigma_bar = np.zeros([K, 14])
+z_bar = np.zeros([K, 14])
+
+# integration initial condition
+V0 = np.zeros((322,))
+V0[14:210] = np.eye(14).reshape(-1)
+
 # START SUCCESSIVE CONVEXIFICATION--------------------------------------------------------------------------------------
 for it in range(iterations):
-    print("Iteration", it + 1)
-    A_bar = np.zeros([K, 14, 14])
-    B_bar = np.zeros([K, 14, 3])
-    C_bar = np.zeros([K, 14, 3])
-    Sigma_bar = np.zeros([K, 14])
-    z_bar = np.zeros([K, 14])
+    print("\n")
+    print("------------------")
+    print("-- Iteration", str(it + 1).zfill(2), "--")
+    print("------------------")
 
     print("Calculating new transition matrices.")
-
     for k in range(0, K - 1):
         # find A_bar, B_bar, C_bar, Sigma_bar, z_bar
-        V0 = np.zeros((322,))
         V0[0:14] = X[k, :]
-        V0[14:210] = np.eye(14).reshape(-1)
         V = np.array(odeint(ode_dVdt, V0, (0, dt), args=(U[k, :], U[k + 1, :], sigma)))[1, :]
-        Phi = V[14:210].reshape((14,14))
+        # using \Phi_A(\tau_{k+1},\xi) = \Phi_A(\tau_{k+1},\tau_k)\Phi_A(\xi,\tau_k)^{-1}
+        Phi = V[14:210].reshape((14, 14))
         A_bar[k, :, :] = V[14:210].reshape((14, 14))
         B_bar[k, :, :] = np.matmul(Phi, V[210:252].reshape((14, 3)))
         C_bar[k, :, :] = np.matmul(Phi, V[252:294].reshape((14, 3)))
@@ -168,6 +177,7 @@ for it in range(iterations):
         z_bar[k, :] = np.matmul(Phi, V[308:322])
 
     # CVX ----------------------------------------------------------------------------------------------------------
+    # pass parameters to model (CVXPY uses Fortran order)
     A_bar_.value = A_bar.reshape((K, 14 * 14), order='F')
     B_bar_.value = B_bar.reshape((K, 14 * 3), order='F')
     C_bar_.value = C_bar.reshape((K, 14 * 3), order='F')
@@ -176,19 +186,25 @@ for it in range(iterations):
     X_last_.value = X
     U_last_.value = U
     sigma_last_.value = sigma
-    w_delta_.value = w_delta if it < 4 else w_delta * 1e3  # for faster convergence
+    w_delta_.value = w_delta if it < 5 else w_delta * 1e3  # for faster convergence
     w_nu_.value = w_nu
     w_delta_sigma_.value = w_delta_sigma
 
     print("Solving problem.")
 
-    prob.solve(verbose=True, solver='ECOS')
+    try:
+        prob.solve(verbose=True, solver='ECOS', max_iters=200)
+    except cvx.error.SolverError:
+        # can sometimes ignore a solver error
+        pass
     # CVX ----------------------------------------------------------------------------------------------------------
 
+    # update values
     X = X_.value
     U = U_.value
     sigma = sigma_.value
 
+    # print status
     delta_norm = np.linalg.norm(delta_.value)
     nu_norm = np.linalg.norm(nu_.value, ord=1)
     print("Flight time:", sigma_.value)
@@ -198,9 +214,12 @@ for it in range(iterations):
         print("Converged after", it + 1, "iterations.")
         break
 
+# save trajectory to file for visualization in Blender (landingVisualization.blend)
 pickle.dump(X, open("visualization/trajectory/X.p", "wb"))
 pickle.dump(U, open("visualization/trajectory/U.p", "wb"))
+pickle.dump(sigma, open("visualization/trajectory/sigma.p", "wb"))
 
+# plot trajectory
 fig = plt.figure()
 ax = fig.add_subplot(111, projection='3d')
 ax.plot(X[:, 2], X[:, 3], X[:, 1], zdir='z')
