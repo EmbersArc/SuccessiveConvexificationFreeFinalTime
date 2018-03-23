@@ -23,8 +23,8 @@ nu_tol = 1e-8
 delta_tol = 1e-3
 
 # State constraints
-r_I_init = np.array((15., 5., 5.))
-v_I_init = np.array((-5, -2, -2))
+r_I_init = np.array((20., 5., 5.))
+v_I_init = np.array((-4, -3, -2))
 q_B_I_init = np.array((1.0, 0.0, 0.0, 0.0))
 w_B_init = np.array((0., 0., 0.))
 

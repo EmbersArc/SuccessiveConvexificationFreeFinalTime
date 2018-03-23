@@ -12,17 +12,18 @@ def create_ranges_nd(start, stop, N, endpoint=True):
     steps = (1.0 / divisor) * (stop - start)
     return start[..., None] + steps[..., None] * np.arange(N)
 
-
-os.chdir("./")
+abspath = os.path.abspath(os.path.dirname(__file__))
+dname = os.path.dirname(abspath)
+os.chdir(dname)
 
 rck = bpy.data.objects["rck"]
 eng = bpy.data.objects["eng"]
 fir = bpy.data.objects["fir"]
 
-X_in = pickle.load(open("X.p", "rb"))
-U_in = pickle.load(open("U.p", "rb"))
+X_in = pickle.load(open("trajectory/X.p", "rb"))
+U_in = pickle.load(open("trajectory/U.p", "rb"))
 
-FPS = 25  # not really FPS, but frames per discretization step
+FPS = 10  # not really FPS, but frames per discretization step
 
 X = np.empty((len(X_in) * FPS, 14))
 U = np.empty((len(U_in) * FPS, 3))
@@ -44,10 +45,10 @@ for i in range(len(U) - FPS):
     rck.rotation_quaternion = (x[7], x[10], x[9], x[8])
 
     throttle = np.linalg.norm(u)
-    ry = -np.arctan(u[1] / u[0])
-    rx = np.arctan(u[2] / u[0])
+    ry = -np.arctan(u[2] / u[0])
+    rx = np.arctan(u[1] / u[0])
     eng.rotation_euler = (rx, ry, 0)
-    fir.scale[2] = throttle * 2.3
+    fir.scale[2] = throttle / 4.
 
     rck.keyframe_insert(data_path='location')
     rck.keyframe_insert(data_path='rotation_quaternion')

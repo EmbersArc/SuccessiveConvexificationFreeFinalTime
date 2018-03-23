@@ -101,6 +101,7 @@ prob = cvx.Problem(objective, constraints)
 
 print("Problem is " + ("valid." if prob.is_dcp() else "invalid."))
 # CVX ------------------------------------------------------------------------------------------------------------------
+
 # START INITIALIZATION--------------------------------------------------------------------------------------------------
 print("Starting Initialization.")
 sigma = t_f_guess
@@ -121,18 +122,7 @@ print("Initialization finished.")
 
 
 # END INITIALIZATION----------------------------------------------------------------------------------------------------
-def ode_dPhidt(V, t, u_t, u_t1, sigma):
-    u = u_t + t / dt * (u_t1 - u_t)
-    dVdt = np.zeros((14 + 14 * 14,))
-    x = V[0:14]
-    Phi_A = V[14:210].reshape((14, 14))
-    dVdt[0:14] = sigma * f(x, u)
-    dVdt[14:210] = np.matmul(A(x, u, sigma), Phi_A).reshape(-1)
-
-    return dVdt
-
-
-def ode_dVdt(V, t, u_t, u_t1, sigma, Phi):
+def ode_dVdt(V, t, u_t, u_t1, sigma):
     # V = x(14), Phi_A(14x14), B_bar(14x3), C_bar(14x3), Simga_bar(14), z_bar(14)
     u = u_t + t / dt * (u_t1 - u_t)
     alpha = t / dt
@@ -140,10 +130,10 @@ def ode_dVdt(V, t, u_t, u_t1, sigma, Phi):
     dVdt = np.zeros((14 + 14 * 14 + 14 * 3 + 14 * 3 + 14 + 14,))
     x = V[0:14]
 
-    Phi_A_xi = Phi * np.linalg.inv(V[14:210].reshape((14, 14)))
+    Phi_A_xi = np.linalg.inv(V[14:210].reshape((14, 14)))
 
     dVdt[0:14] = sigma * f(x, u)
-    dVdt[14:210] = np.matmul(A(x, u, sigma), Phi_A_xi).reshape(-1)
+    dVdt[14:210] = np.matmul(A(x, u, sigma), V[14:210].reshape((14, 14))).reshape(-1)
     dVdt[210:252] = np.matmul(Phi_A_xi, B(x, u, sigma)).reshape(-1) * alpha
     dVdt[252:294] = np.matmul(Phi_A_xi, B(x, u, sigma)).reshape(-1) * beta
     dVdt[294:308] = np.matmul(Phi_A_xi, f(x, u))
@@ -169,16 +159,13 @@ for it in range(iterations):
         V0 = np.zeros((322,))
         V0[0:14] = X[k, :]
         V0[14:210] = np.eye(14).reshape(-1)
-        Phi = np.array(odeint(ode_dPhidt, V0[0:210], (0, dt), args=(U[k, :], U[k + 1, :], sigma)))[1,
-              14:].reshape((14, 14))
-
-        V = np.array(odeint(ode_dVdt, V0, (0, dt), args=(U[k, :], U[k + 1, :], sigma, Phi)))[1, :]
-
+        V = np.array(odeint(ode_dVdt, V0, (0, dt), args=(U[k, :], U[k + 1, :], sigma)))[1, :]
+        Phi = V[14:210].reshape((14,14))
         A_bar[k, :, :] = V[14:210].reshape((14, 14))
-        B_bar[k, :, :] = V[210:252].reshape((14, 3))
-        C_bar[k, :, :] = V[252:294].reshape((14, 3))
-        Sigma_bar[k, :] = V[294:308]
-        z_bar[k, :] = V[308:322]
+        B_bar[k, :, :] = np.matmul(Phi, V[210:252].reshape((14, 3)))
+        C_bar[k, :, :] = np.matmul(Phi, V[252:294].reshape((14, 3)))
+        Sigma_bar[k, :] = np.matmul(Phi, V[294:308])
+        z_bar[k, :] = np.matmul(Phi, V[308:322])
 
     # CVX ----------------------------------------------------------------------------------------------------------
     A_bar_.value = A_bar.reshape((K, 14 * 14), order='F')
