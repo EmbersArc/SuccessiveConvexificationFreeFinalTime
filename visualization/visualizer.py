@@ -15,7 +15,7 @@ X = pickle.load(open("trajectory/X.p", "rb"))
 U = pickle.load(open("trajectory/U.p", "rb"))
 sigma = pickle.load(open("trajectory/sigma.p", "rb"))
 
-FPS = int(sigma * 1.5) # frames per discretization step
+FPS = int(sigma * 1.5) * 2 # frames per discretization step
 
 bpy.data.scenes["Scene"].frame_current = 1
 
