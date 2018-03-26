@@ -7,24 +7,24 @@ dt = 1 / (K - 1)
 iterations = 15
 
 # Mass
-m_wet = 2.0
-m_dry = 1.0
+m_wet = 2  # 33000kg
+m_dry = 1  # 26000kg
 
 # Flight time guess
-t_f_guess = 5.
+t_f_guess = 1.  # 10s
 
 # # Weight constants
-w_nu = 1e5
-w_delta = 1e-3
-w_delta_sigma = 1e-1
+w_nu = 1e5  # 1e5
+w_delta = 1e-3  # 1e-3
+w_delta_sigma = 1e-1  # 1e-1
 
 # Exit conditions
 nu_tol = 1e-8
 delta_tol = 1e-3
 
 # State constraints
-r_I_init = np.array((20., 5, 5))
-v_I_init = np.array((-7, -3, -3))
+r_I_init = np.array((10., 3., 3.))  # 2000m, 200m, 200m
+v_I_init = np.array((-4, -1, -1))  # -300m/s, 50m/s, 50m/s
 q_B_I_init = np.array((1.0, 0.0, 0.0, 0.0))
 w_B_init = np.array((0., 0., 0.))
 
@@ -41,23 +41,23 @@ cos_theta_max = np.cos(np.deg2rad(90))
 tan_gamma_gs = np.tan(np.deg2rad(20))
 
 # Angular moment of inertia
-J_B_I = np.array((1e-2, 1e-2, 1e-2))
+J_B_I = np.array((1e-2, 1e-2, 1e-2))  # 4500000kg*m^2, 4500000kg*m^2, 100000kg*m^2
 J_B1, J_B2, J_B3 = J_B_I
 
 # Vector from thrust point to CoM
-r_T_B = np.array((-1e-2, 0., 0.))
+r_T_B = np.array((-1e-2, 0., 0.))  # -20m
 r_T_B1, r_T_B2, r_T_B3 = r_T_B
 
 # Gravity
-g_I = np.array((-1., 0., 0.))
+g_I = np.array((-1, 0., 0.))  # -9.81 m/s^2
 g_I1, g_I2, g_I3 = g_I
 
 # Thrust limits
-T_min = 2.0
-T_max = 5.0
+T_max = 5  # 845000 kg*m/s^2
+T_min = 2
 
 # Fuel consumption
-alpha_m = 0.01
+alpha_m = 0.02  # 1 / (282s * 9.81m/s^2))
 
 
 # Linearized state matrices:
@@ -102,7 +102,8 @@ def A(x, u, sigma_hat):
         (0, 0, 0, 0, 0, 0, 0, x[12] / 2, -x[13] / 2, 0, x[11] / 2, x[10] / 2, x[7] / 2, -x[8] / 2),
         (0, 0, 0, 0, 0, 0, 0, x[13] / 2, x[12] / 2, -x[11] / 2, 0, -x[9] / 2, x[8] / 2, x[7] / 2),
         (
-        0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, (J_B2 * x[13] - J_B3 * x[13]) / J_B1, (J_B2 * x[12] - J_B3 * x[12]) / J_B1),
+            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, (J_B2 * x[13] - J_B3 * x[13]) / J_B1,
+            (J_B2 * x[12] - J_B3 * x[12]) / J_B1),
         (0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -(J_B1 * x[13] - J_B3 * x[13]) / J_B2, 0,
          -(J_B1 * x[11] - J_B3 * x[11]) / J_B2),
         (0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, (J_B1 * x[12] - J_B2 * x[12]) / J_B3, (J_B1 * x[11] - J_B2 * x[11]) / J_B3, 0)
