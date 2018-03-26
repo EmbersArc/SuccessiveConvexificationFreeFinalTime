@@ -18,7 +18,7 @@ X_ = cvx.Variable((K, 14))
 U_ = cvx.Variable((K, 3))
 sigma_ = cvx.Variable()
 nu_ = cvx.Variable((14 * (K - 1)))
-delta_ = cvx.Variable(K)
+delta_ = cvx.Variable(K, 1)
 delta_s_ = cvx.Variable()
 
 # Parameters:
@@ -36,26 +36,29 @@ w_delta_sigma_ = cvx.Parameter(nonneg=True)
 
 # Boundary conditions:
 constraints = [
-    X_[0, 0] == x_init[0],
-    X_[0, 1:4] == x_init[1:4],
-    X_[0, 4:7] == x_init[4:7],
-    # X_[0, 7:11] == x_init[7:11],  # initial attitude is free
-    X_[0, 11:14] == x_init[11:14],
-
-    # X_[0, 0] == x_final[0], # final mass is free
-    X_[K - 1, 1:4] == x_final[1:4],
-    X_[K - 1, 4:7] == x_final[4:7],
-    X_[K - 1, 7:11] == x_final[7:11],
-    X_[K - 1, 11:14] == x_final[11:14],
-
-    U_[K - 1, 1] == 0,
-    U_[K - 1, 2] == 0
+X_[0, 0] == x_init[0],
+X_[K - 1, 7:11] == x_final[7:11]
 ]
 
+RHS = [
+    X_[0, 1:4] - x_init[1:4],
+    X_[0, 4:7] - x_init[4:7],
+    # X_[0, 7:11] == x_init[7:11],  # initial attitude is free
+    X_[0, 11:14] - x_init[11:14],
+
+    # X_[0, 0] == x_final[0], # final mass is free
+    X_[K - 1, 1:4] - x_final[1:4],
+    X_[K - 1, 4:7] - x_final[4:7],
+    X_[K - 1, 11:14] - x_final[11:14],
+]
+constraints += [0 == cvx.vstack(RHS)]
+
+constraints += [U_[K - 1, 1:3] == 0]
+
 # Dynamics:
+RHS = []
 for k in range(K - 1):
-    constraints += [
-        X_[k + 1, :] ==
+    RHS += [
         cvx.reshape(A_bar_[k, :], (14, 14)) * X_[k, :]
         + cvx.reshape(B_bar_[k, :], (14, 3)) * U_[k, :]
         + cvx.reshape(C_bar_[k, :], (14, 3)) * U_[k + 1, :]
@@ -63,32 +66,35 @@ for k in range(K - 1):
         + z_bar_[k, :]
         + nu_[k * 14:(k + 1) * 14]
     ]
+constraints += [X_[range(1, K), :] == cvx.vstack(RHS)]
 
-# State constraints:
 constraints += [X_[:, 0] >= m_dry]
-for k in range(K):
-    constraints += [
-        tan_gamma_gs * cvx.norm(X_[k, 2: 4]) <= X_[k, 1],
-        cos_theta_max <= 1 - 2 * cvx.sum_squares(X_[k, 9:11]),
-        cvx.norm(X_[k, 11: 14]) <= w_B_max
-    ]
 
-# Control constraints:
+RHS = []
 for k in range(K):
     B_g = U_last_[k, :] / cvx.norm(U_last_[k, :])
-    constraints += [
-        T_min <= B_g * U_[k, :],
-        cvx.norm(U_[k, :]) <= T_max,
-        cos_delta_max * cvx.norm(U_[k, :]) <= U_[k, 0]
+    RHS += [
+        # State constraints:
+        tan_gamma_gs * cvx.norm(X_[k, 2: 4]) - X_[k, 1],
+        cos_theta_max - 1.0 + 2 * cvx.sum_squares(X_[k, 9:11]),
+        # ValueError: All the input dimensions except for axis 0 must match exactly. (sum instead of sum_squares works)
+        cvx.norm(X_[k, 11: 14]) - w_B_max,
+
+        # Control constraints:
+        T_min - B_g * U_[k, :],
+        cvx.norm(U_[k, :]) - T_max,
+        cos_delta_max * cvx.norm(U_[k, :]) - U_[k, 0]
     ]
+constraints += [0 >= cvx.vstack(RHS)]
 
 # Trust regions:
+RHS = []
 for k in range(K):
     dx = X_[k, :] - X_last_[k, :]
     du = U_[k, :] - U_last_[k, :]
-    constraints += [
-        cvx.sum_squares(dx) + cvx.sum_squares(du) <= delta_[k]
-    ]
+    RHS += [cvx.sum_squares(dx) + cvx.sum_squares(du)]
+constraints += [cvx.reshape(cvx.vstack(RHS), shape=(K,)) <= delta_]
+
 ds = sigma_ - sigma_last_
 constraints += [cvx.norm(ds, 2) <= delta_s_]
 
@@ -119,6 +125,8 @@ for k in range(K):
     U[k, :] = m_k * -g_I
 
 print("Initialization finished.")
+
+
 # END INITIALIZATION----------------------------------------------------------------------------------------------------
 
 
@@ -191,7 +199,6 @@ for it in range(iterations):
     w_delta_sigma_.value = w_delta_sigma
 
     print("Solving problem.")
-
     try:
         prob.solve(verbose=True, solver='ECOS', max_iters=200)
     except cvx.error.SolverError:
