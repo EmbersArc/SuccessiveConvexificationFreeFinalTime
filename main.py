@@ -22,11 +22,11 @@ delta_ = cvx.Variable(K)
 delta_s_ = cvx.Variable()
 
 # Parameters:
-A_bar_ = cvx.Parameter((K, 14 * 14))
-B_bar_ = cvx.Parameter((K, 14 * 3))
-C_bar_ = cvx.Parameter((K, 14 * 3))
-Sigma_bar_ = cvx.Parameter((K, 14))
-z_bar_ = cvx.Parameter((K, 14))
+A_bar_ = cvx.Parameter((K-1, 14 * 14))
+B_bar_ = cvx.Parameter((K-1, 14 * 3))
+C_bar_ = cvx.Parameter((K-1, 14 * 3))
+Sigma_bar_ = cvx.Parameter((K-1, 14))
+z_bar_ = cvx.Parameter((K-1, 14))
 X_last_ = cvx.Parameter((K, 14))
 U_last_ = cvx.Parameter((K, 3))
 sigma_last_ = cvx.Parameter(nonneg=True)
@@ -148,11 +148,11 @@ def ode_dVdt(V, t, u_t, u_t1, sigma):
     return dVdt
 
 
-A_bar = np.zeros([K, 14, 14])
-B_bar = np.zeros([K, 14, 3])
-C_bar = np.zeros([K, 14, 3])
-Sigma_bar = np.zeros([K, 14])
-z_bar = np.zeros([K, 14])
+A_bar = np.zeros([K-1, 14, 14])
+B_bar = np.zeros([K-1, 14, 3])
+C_bar = np.zeros([K-1, 14, 3])
+Sigma_bar = np.zeros([K-1, 14])
+z_bar = np.zeros([K-1, 14])
 
 # integration initial condition
 V0 = np.zeros((322,))
@@ -180,9 +180,9 @@ for it in range(iterations):
 
     # CVX ----------------------------------------------------------------------------------------------------------
     # pass parameters to model (CVXPY uses Fortran order)
-    A_bar_.value = A_bar.reshape((K, 14 * 14), order='F')
-    B_bar_.value = B_bar.reshape((K, 14 * 3), order='F')
-    C_bar_.value = C_bar.reshape((K, 14 * 3), order='F')
+    A_bar_.value = A_bar.reshape((K-1, 14 * 14), order='F')
+    B_bar_.value = B_bar.reshape((K-1, 14 * 3), order='F')
+    C_bar_.value = C_bar.reshape((K-1, 14 * 3), order='F')
     Sigma_bar_.value = Sigma_bar
     z_bar_.value = z_bar
     X_last_.value = X
