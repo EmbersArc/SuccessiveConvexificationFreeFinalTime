@@ -1,5 +1,7 @@
 import matplotlib.pyplot as plt
+import numpy as np
 from mpl_toolkits import mplot3d
+from model_6dof import Model_6DoF
 from parameters import *
 import pickle
 import cvxpy as cvx
@@ -8,8 +10,7 @@ from scipy.integrate import odeint
 X = np.empty(shape=[K, 14])
 U = np.empty(shape=[K, 3])
 
-x_init = np.concatenate(((m_wet,), r_I_init, v_I_init, q_B_I_init, w_B_init))
-x_final = np.concatenate(((m_dry,), r_I_final, v_I_final, q_B_I_final, w_B_final))
+m = Model_6DoF()
 
 # CVX ------------------------------------------------------------------------------------------------------------------
 print("Setting up problem.")
@@ -22,11 +23,11 @@ delta_ = cvx.Variable(K)
 delta_s_ = cvx.Variable()
 
 # Parameters:
-A_bar_ = cvx.Parameter((K-1, 14 * 14))
-B_bar_ = cvx.Parameter((K-1, 14 * 3))
-C_bar_ = cvx.Parameter((K-1, 14 * 3))
-Sigma_bar_ = cvx.Parameter((K-1, 14))
-z_bar_ = cvx.Parameter((K-1, 14))
+A_bar_ = cvx.Parameter((K - 1, 14 * 14))
+B_bar_ = cvx.Parameter((K - 1, 14 * 3))
+C_bar_ = cvx.Parameter((K - 1, 14 * 3))
+Sigma_bar_ = cvx.Parameter((K - 1, 14))
+z_bar_ = cvx.Parameter((K - 1, 14))
 X_last_ = cvx.Parameter((K, 14))
 U_last_ = cvx.Parameter((K, 3))
 sigma_last_ = cvx.Parameter(nonneg=True)
@@ -34,23 +35,7 @@ w_delta_ = cvx.Parameter(nonneg=True)
 w_nu_ = cvx.Parameter(nonneg=True)
 w_delta_sigma_ = cvx.Parameter(nonneg=True)
 
-# Boundary conditions:
-constraints = [
-    X_[0, 0] == x_init[0],
-    X_[0, 1:4] == x_init[1:4],
-    X_[0, 4:7] == x_init[4:7],
-    # X_[0, 7:11] == x_init[7:11],  # initial attitude is free
-    X_[0, 11:14] == x_init[11:14],
-
-    # X_[0, 0] == x_final[0], # final mass is free
-    X_[K - 1, 1:4] == x_final[1:4],
-    X_[K - 1, 4:7] == x_final[4:7],
-    X_[K - 1, 7:11] == x_final[7:11],
-    X_[K - 1, 11:14] == x_final[11:14],
-
-    U_[K - 1, 1] == 0,
-    U_[K - 1, 2] == 0
-]
+constraints = []
 
 # Dynamics:
 for k in range(K - 1):
@@ -64,24 +49,6 @@ for k in range(K - 1):
         + nu_[k * 14:(k + 1) * 14]
     ]
 
-# State constraints:
-constraints += [X_[:, 0] >= m_dry]
-for k in range(K):
-    constraints += [
-        tan_gamma_gs * cvx.norm(X_[k, 2: 4]) <= X_[k, 1],
-        cos_theta_max <= 1 - 2 * cvx.sum_squares(X_[k, 9:11]),
-        cvx.norm(X_[k, 11: 14]) <= w_B_max
-    ]
-
-# Control constraints:
-for k in range(K):
-    B_g = U_last_[k, :] / cvx.norm(U_last_[k, :])
-    constraints += [
-        T_min <= B_g * U_[k, :],
-        cvx.norm(U_[k, :]) <= T_max,
-        cos_delta_max * cvx.norm(U_[k, :]) <= U_[k, 0]
-    ]
-
 # Trust regions:
 for k in range(K):
     dx = X_[k, :] - X_last_[k, :]
@@ -91,6 +58,8 @@ for k in range(K):
     ]
 ds = sigma_ - sigma_last_
 constraints += [cvx.norm(ds, 2) <= delta_s_]
+
+constraints += m.get_constraints(X_, U_, X_last_, U_last_)
 
 # Objective:
 objective = cvx.Minimize(
@@ -102,27 +71,12 @@ prob = cvx.Problem(objective, constraints)
 print("Problem is " + ("valid." if prob.is_dcp() else "invalid."))
 # CVX ------------------------------------------------------------------------------------------------------------------
 
-# START INITIALIZATION--------------------------------------------------------------------------------------------------
-print("Starting Initialization.")
-sigma = t_f_guess
+# INITIALIZATION--------------------------------------------------------------------------------------------------------
 
-for k in range(K):
-    alpha1 = (K - k) / K
-    alpha2 = k / K
-    m_k = (alpha1 * x_init[0] + alpha2 * x_final[0],)
-    r_I_k = alpha1 * x_init[1:4] + alpha2 * x_final[1:4]
-    v_I_k = alpha1 * x_init[4:7] + alpha2 * x_final[4:7]
-    q_B_I_k = np.array((1.0, 0.0, 0.0, 0.0))
-    w_B_k = alpha1 * x_init[11:14] + alpha2 * x_final[11:14]
+sigma = m.t_f_guess
+m.initialize(X, U)
 
-    X[k, :] = np.concatenate((m_k, r_I_k, v_I_k, q_B_I_k, w_B_k))
-    U[k, :] = m_k * -g_I
-
-print("Initialization finished.")
-
-
-# END INITIALIZATION----------------------------------------------------------------------------------------------------
-
+f, A, B = m.get_equations()
 
 # ODE function to compute dVdt
 # V = [x(14), Phi_A(14x14), B_bar(14x3), C_bar(14x3), Simga_bar(14), z_bar(14)]
@@ -136,23 +90,22 @@ def ode_dVdt(V, t, u_t, u_t1, sigma):
     # using \Phi_A(\tau_{k+1},\xi) = \Phi_A(\tau_{k+1},\tau_k)\Phi_A(\xi,\tau_k)^{-1}
     # and pre-multiplying with \Phi_A(\tau_{k+1},\tau_k) after integration
     Phi_A_xi = np.linalg.inv(V[14:210].reshape((14, 14)))
-
-    dVdt[0:14] = sigma * f(x, u)
-    dVdt[14:210] = np.matmul(A(x, u, sigma), V[14:210].reshape((14, 14))).reshape(-1)
-    dVdt[210:252] = np.matmul(Phi_A_xi, B(x, u, sigma)).reshape(-1) * alpha
-    dVdt[252:294] = np.matmul(Phi_A_xi, B(x, u, sigma)).reshape(-1) * beta
-    dVdt[294:308] = np.matmul(Phi_A_xi, f(x, u))
-    z_t = -np.matmul(A(x, u, sigma), x) - np.matmul(B(x, u, sigma), u)
+    dVdt[0:14] = sigma * f(x, u).transpose()
+    dVdt[14:210] = np.matmul(sigma * A(x, u), V[14:210].reshape((14, 14))).reshape(-1)
+    dVdt[210:252] = np.matmul(Phi_A_xi, sigma * B(x, u)).reshape(-1) * alpha
+    dVdt[252:294] = np.matmul(Phi_A_xi, sigma * B(x, u)).reshape(-1) * beta
+    dVdt[294:308] = np.matmul(Phi_A_xi, f(x, u)).transpose()
+    z_t = -np.matmul(sigma * A(x, u), x) - np.matmul(sigma * B(x, u), u)
     dVdt[308:322] = np.matmul(Phi_A_xi, z_t)
 
     return dVdt
 
 
-A_bar = np.zeros([K-1, 14, 14])
-B_bar = np.zeros([K-1, 14, 3])
-C_bar = np.zeros([K-1, 14, 3])
-Sigma_bar = np.zeros([K-1, 14])
-z_bar = np.zeros([K-1, 14])
+A_bar = np.zeros([K - 1, 14, 14])
+B_bar = np.zeros([K - 1, 14, 3])
+C_bar = np.zeros([K - 1, 14, 3])
+Sigma_bar = np.zeros([K - 1, 14])
+z_bar = np.zeros([K - 1, 14])
 
 # integration initial condition
 V0 = np.zeros((322,))
@@ -180,9 +133,9 @@ for it in range(iterations):
 
     # CVX ----------------------------------------------------------------------------------------------------------
     # pass parameters to model (CVXPY uses Fortran order)
-    A_bar_.value = A_bar.reshape((K-1, 14 * 14), order='F')
-    B_bar_.value = B_bar.reshape((K-1, 14 * 3), order='F')
-    C_bar_.value = C_bar.reshape((K-1, 14 * 3), order='F')
+    A_bar_.value = A_bar.reshape((K - 1, 14 * 14), order='F')
+    B_bar_.value = B_bar.reshape((K - 1, 14 * 3), order='F')
+    C_bar_.value = C_bar.reshape((K - 1, 14 * 3), order='F')
     Sigma_bar_.value = Sigma_bar
     z_bar_.value = z_bar
     X_last_.value = X
@@ -217,7 +170,6 @@ for it in range(iterations):
         break
 
 # save trajectory to file for visualization in Blender (landingVisualization.blend)
-
 pickle.dump(X, open("visualization/trajectory/X.p", "wb"))
 pickle.dump(U, open("visualization/trajectory/U.p", "wb"))
 pickle.dump(sigma, open("visualization/trajectory/sigma.p", "wb"))
@@ -226,8 +178,8 @@ pickle.dump(sigma, open("visualization/trajectory/sigma.p", "wb"))
 fig = plt.figure()
 ax = fig.add_subplot(111, projection='3d')
 ax.plot(X[:, 2], X[:, 3], X[:, 1], zdir='z')
-ax.set_xlim(-r_I_init[0], r_I_init[0])
-ax.set_ylim(-r_I_init[0], r_I_init[0])
-ax.set_zlim(0, r_I_init[0])
+ax.set_xlim(-m.x_init[1], m.x_init[1])
+ax.set_ylim(-m.x_init[1], m.x_init[1])
+ax.set_zlim(0, m.x_init[1])
 
 plt.show()
