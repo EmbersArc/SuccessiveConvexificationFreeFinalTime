@@ -15,7 +15,7 @@ J_B = diag(sym('J_B',[3,1]));
 % fuel consumption rate
 alpha_m = sym('alpha_m');
 % rotation matrix from I to B
-C_I_B = quat2rotmsym(x(8:11));
+C_I_B = transpose(quat2rotmsym(x(8:11)));
 
 % nonlinear state transition
 m_dot = -alpha_m * norm(u);
