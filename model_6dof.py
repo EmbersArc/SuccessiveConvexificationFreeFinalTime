@@ -38,7 +38,7 @@ class Model_6DoF:
 
     # State constraints
     r_I_init = np.array((10., 5., 3.))  # 2000m, 200m, 200m
-    v_I_init = np.array((-4, -2, -1))  # -300m/s, 50m/s, 50m/s
+    v_I_init = np.array((-4, -4, 0))  # -300m/s, 50m/s, 50m/s
     q_B_I_init = np.array((1.0, 0.0, 0.0, 0.0))
     w_B_init = np.array((0., 0., 0.))
 

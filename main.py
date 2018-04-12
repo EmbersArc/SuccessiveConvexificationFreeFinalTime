@@ -1,11 +1,11 @@
-import matplotlib.pyplot as plt
-import numpy as np
-from mpl_toolkits import mplot3d
-from model_6dof import Model_6DoF
-from parameters import *
 import pickle
+import numpy as np
 import cvxpy as cvx
 from scipy.integrate import odeint
+from visualization.plot3d import plot3d
+
+from model_6dof import Model_6DoF
+from parameters import *
 
 X = np.empty(shape=[K, 14])
 U = np.empty(shape=[K, 3])
@@ -78,6 +78,7 @@ m.initialize(X, U)
 
 f, A, B = m.get_equations()
 
+
 # ODE function to compute dVdt
 # V = [x(14), Phi_A(14x14), B_bar(14x3), C_bar(14x3), Simga_bar(14), z_bar(14)]
 def ode_dVdt(V, t, u_t, u_t1, sigma):
@@ -112,6 +113,9 @@ V0 = np.zeros((322,))
 V0[14:210] = np.eye(14).reshape(-1)
 
 # START SUCCESSIVE CONVEXIFICATION--------------------------------------------------------------------------------------
+all_X = [X]
+all_U = [U]
+
 for it in range(iterations):
     print("\n")
     print("------------------")
@@ -159,6 +163,9 @@ for it in range(iterations):
     U = U_.value
     sigma = sigma_.value
 
+    all_X.append(X)
+    all_U.append(U)
+
     # print status
     delta_norm = np.linalg.norm(delta_.value)
     nu_norm = np.linalg.norm(nu_.value, ord=1)
@@ -169,17 +176,13 @@ for it in range(iterations):
         print("Converged after", it + 1, "iterations.")
         break
 
-# save trajectory to file for visualization in Blender (landingVisualization.blend)
-pickle.dump(X, open("visualization/trajectory/X.p", "wb"))
-pickle.dump(U, open("visualization/trajectory/U.p", "wb"))
+all_X = np.stack(all_X)
+all_U = np.stack(all_U)
+
+# save trajectory to file for visualization
+pickle.dump(all_X, open("visualization/trajectory/X.p", "wb"))
+pickle.dump(all_U, open("visualization/trajectory/U.p", "wb"))
 pickle.dump(sigma, open("visualization/trajectory/sigma.p", "wb"))
 
 # plot trajectory
-fig = plt.figure()
-ax = fig.add_subplot(111, projection='3d')
-ax.plot(X[:, 2], X[:, 3], X[:, 1], zdir='z')
-ax.set_xlim(-m.x_init[1], m.x_init[1])
-ax.set_ylim(-m.x_init[1], m.x_init[1])
-ax.set_zlim(0, m.x_init[1])
-
-plt.show()
+plot3d(all_X, all_U)
