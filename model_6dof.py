@@ -29,6 +29,9 @@ def omega(w):
 
 
 class Model_6DoF:
+    n_state = 14
+    n_input = 3
+
     # Mass
     m_wet = 2  # 33000kg
     m_dry = 1  # 26000kg
@@ -104,7 +107,7 @@ class Model_6DoF:
     def initialize(self, X, U):
         print("Starting Initialization.")
 
-        K = len(X)
+        K = X.shape[1]
 
         for k in range(K):
             alpha1 = (K - k) / K
@@ -115,48 +118,48 @@ class Model_6DoF:
             q_B_I_k = np.array((1.0, 0.0, 0.0, 0.0))
             w_B_k = alpha1 * self.x_init[11:14] + alpha2 * self.x_final[11:14]
 
-            X[k, :] = np.concatenate((m_k, r_I_k, v_I_k, q_B_I_k, w_B_k))
-            U[k, :] = m_k * -self.g_I
+            X[:, k] = np.concatenate((m_k, r_I_k, v_I_k, q_B_I_k, w_B_k))
+            U[:, k] = m_k * -self.g_I
 
         print("Initialization finished.")
 
     def get_constraints(self, X_, U_, X_last_, U_last_):
-        K = X_.shape[0]
+        K = X_.shape[1]
 
         # Boundary conditions:
         constraints = [
             X_[0, 0] == self.x_init[0],
-            X_[0, 1:4] == self.x_init[1:4],
-            X_[0, 4:7] == self.x_init[4:7],
+            X_[1:4, 0] == self.x_init[1:4],
+            X_[4:7, 0] == self.x_init[4:7],
             # X_[0, 7:11] == x_init[7:11],  # initial attitude is free
-            X_[0, 11:14] == self.x_init[11:14],
+            X_[11:14, 0] == self.x_init[11:14],
 
             # X_[0, 0] == x_final[0], # final mass is free
-            X_[K - 1, 1:4] == self.x_final[1:4],
-            X_[K - 1, 4:7] == self.x_final[4:7],
-            X_[K - 1, 7:11] == self.x_final[7:11],
-            X_[K - 1, 11:14] == self.x_final[11:14],
+            X_[1:4, K - 1] == self.x_final[1:4],
+            X_[4:7, K - 1] == self.x_final[4:7],
+            X_[7:11, K - 1] == self.x_final[7:11],
+            X_[11:14, K - 1] == self.x_final[11:14],
 
-            U_[K - 1, 1] == 0,
-            U_[K - 1, 2] == 0
+            U_[1, K - 1] == 0,
+            U_[2, K - 1] == 0
         ]
 
         # State constraints:
-        constraints += [X_[:, 0] >= self.m_dry]
+        constraints += [X_[0, :] >= self.m_dry]
         for k in range(K):
             constraints += [
-                cvx.norm(X_[k, 2: 4]) <= X_[k, 1] / self.tan_gamma_gs,
-                cvx.norm(X_[k, 9:11]) <= np.sqrt((1 - self.cos_theta_max) / 2),
-                cvx.norm(X_[k, 11: 14]) <= self.w_B_max
+                cvx.norm(X_[2: 4, k]) <= X_[1, k] / self.tan_gamma_gs,
+                cvx.norm(X_[9:11, k]) <= np.sqrt((1 - self.cos_theta_max) / 2),
+                cvx.norm(X_[11: 14, k]) <= self.w_B_max
             ]
 
         # Control constraints:
         for k in range(K):
-            B_g = U_last_[k, :] / cvx.norm(U_last_[k, :])
+            B_g = U_last_[:, k] / cvx.norm(U_last_[:, k])
             constraints += [
-                self.T_min <= B_g * U_[k, :],
-                cvx.norm(U_[k, :]) <= self.T_max,
-                cvx.norm(U_[k, :]) <= U_[k, 0] / self.cos_delta_max
+                self.T_min <= B_g * U_[:, k],
+                cvx.norm(U_[:, k]) <= self.T_max,
+                cvx.norm(U_[:, k]) <= U_[0, k] / self.cos_delta_max
             ]
 
         return constraints

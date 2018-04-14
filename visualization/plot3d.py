@@ -29,16 +29,16 @@ def my_plot(fig, figures_i):
 
     X_i = X[figures_i, :, :]
     U_i = U[figures_i, :, :]
-    K = X_i.shape[0]
+    K = X_i.shape[1]
 
     ax.set_zlabel('X, up')
     ax.set_xlabel('Y, east')
     ax.set_ylabel('Z, north')
 
     for k in range(K):
-        rx, ry, rz = X_i[k, 1:4]
-        vx, vy, vz = X_i[k, 4:7]
-        qw, qx, qy, qz = X_i[k, 7:11]
+        rx, ry, rz = X_i[1:4, k]
+        vx, vy, vz = X_i[4:7, k]
+        qw, qx, qy, qz = X_i[7:11, k]
 
         CBI = np.array([
             [1 - 2 * (qy ** 2 + qz ** 2), 2 * (qx * qy + qw * qz), 2 * (qx * qz - qw * qy)],
@@ -46,7 +46,7 @@ def my_plot(fig, figures_i):
             [2 * (qx * qz + qw * qy), 2 * (qy * qz - qw * qx), 1 - 2 * (qx ** 2 + qy ** 2)]
         ])
 
-        Fx, Fy, Fz = np.dot(np.transpose(CBI), U_i[k, :])
+        Fx, Fy, Fz = np.dot(np.transpose(CBI), U_i[:, k])
         dx, dy, dz = np.dot(np.transpose(CBI), np.array([1., 0., 0.]))
 
         # speed vector
@@ -60,7 +60,7 @@ def my_plot(fig, figures_i):
 
     ax.axis('equal')
     ax.set_title("iter " + str(figures_i))
-    ax.plot(X_i[:, 2], X_i[:, 3], X_i[:, 1], color='black')
+    ax.plot(X_i[2, :], X_i[3, :], X_i[1, :], color='black')
 
 
 def plot3d(X_in, U_in):
@@ -80,7 +80,7 @@ def plot3d(X_in, U_in):
 if __name__ == "__main__":
     import pickle
 
-    X_in = np.stack(pickle.load(open("trajectory/X.p", "rb")))
-    U_in = np.stack(pickle.load(open("trajectory/U.p", "rb")))
+    X_in = pickle.load(open("trajectory/X.p", "rb"))
+    U_in = pickle.load(open("trajectory/U.p", "rb"))
 
     plot3d(X_in, U_in)
