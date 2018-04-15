@@ -66,6 +66,7 @@ def my_plot(fig, figures_i):
 def plot3d(X_in, U_in):
     global figures_N
     figures_N = X_in.shape[0]
+    figures_i = figures_N - 1
 
     global X, U
     X = X_in

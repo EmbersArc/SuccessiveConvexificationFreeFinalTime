@@ -1,5 +1,5 @@
 # Trajectory points
-K = 70
+K = 50
 dt = 1 / (K - 1)
 
 # Max solver iterations

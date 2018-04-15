@@ -29,19 +29,19 @@ def omega(w):
 
 
 class Model_6DoF:
-    n_state = 14
-    n_input = 3
+    n_x = 14
+    n_u = 3
 
     # Mass
     m_wet = 2  # 33000kg
     m_dry = 1  # 26000kg
 
     # Flight time guess
-    t_f_guess = 1.  # 10s
+    t_f_guess = 3  # 10s
 
     # State constraints
-    r_I_init = np.array((10., 5., 3.))  # 2000m, 200m, 200m
-    v_I_init = np.array((-4, -4, 0))  # -300m/s, 50m/s, 50m/s
+    r_I_init = np.array((3., 2., 1))  # 2000m, 200m, 200m
+    v_I_init = np.array((0, -1, -1))  # -300m/s, 50m/s, 50m/s
     q_B_I_init = np.array((1.0, 0.0, 0.0, 0.0))
     w_B_init = np.array((0., 0., 0.))
 
@@ -74,7 +74,7 @@ class Model_6DoF:
     g_I = np.array((-1, 0., 0.))  # -9.81 m/s^2
 
     # Fuel consumption
-    alpha_m = 0.02  # 1 / (282s * 9.81m/s^2))
+    alpha_m = 0.005  # 1 / (282s * 9.81m/s^2))
 
     def get_equations(self):
         f = zeros(14, 1)
@@ -135,31 +135,24 @@ class Model_6DoF:
             X_[11:14, 0] == self.x_init[11:14],
 
             # X_[0, 0] == x_final[0], # final mass is free
-            X_[1:4, K - 1] == self.x_final[1:4],
-            X_[4:7, K - 1] == self.x_final[4:7],
-            X_[7:11, K - 1] == self.x_final[7:11],
-            X_[11:14, K - 1] == self.x_final[11:14],
+            X_[1:, K - 1] == self.x_final[1:],
 
-            U_[1, K - 1] == 0,
-            U_[2, K - 1] == 0
+            U_[1:3, K - 1] == 0,
         ]
 
-        # State constraints:
-        constraints += [X_[0, :] >= self.m_dry]
-        for k in range(K):
-            constraints += [
-                cvx.norm(X_[2: 4, k]) <= X_[1, k] / self.tan_gamma_gs,
-                cvx.norm(X_[9:11, k]) <= np.sqrt((1 - self.cos_theta_max) / 2),
-                cvx.norm(X_[11: 14, k]) <= self.w_B_max
-            ]
+        constraints += [
+            # State constraints:
+            X_[0, :] >= self.m_dry,
+            cvx.norm(X_[2: 4, :], axis=0) <= X_[1, :] / self.tan_gamma_gs,
+            cvx.norm(X_[9:11, :], axis=0) <= np.sqrt((1 - self.cos_theta_max) / 2),
+            cvx.norm(X_[11: 14, :], axis=0) <= self.w_B_max,
 
-        # Control constraints:
-        for k in range(K):
-            B_g = U_last_[:, k] / cvx.norm(U_last_[:, k])
-            constraints += [
-                self.T_min <= B_g * U_[:, k],
-                cvx.norm(U_[:, k]) <= self.T_max,
-                cvx.norm(U_[:, k]) <= U_[0, k] / self.cos_delta_max
-            ]
+            # Control constraints:
+            cvx.norm(U_, axis=0) <= U_[0, :] / self.cos_delta_max,
+            cvx.norm(U_, axis=0) <= self.T_max,
+        ]
+        constraints += [
+            self.T_min <= U_last_[:, k] / cvx.norm(U_last_[:, k]) * U_[:, k] for k in range(K)
+        ]
 
         return constraints
