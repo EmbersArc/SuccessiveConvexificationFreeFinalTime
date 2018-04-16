@@ -14,16 +14,6 @@ m = Model_6DoF()
 X = np.empty(shape=[m.n_x, K])
 U = np.empty(shape=[m.n_u, K])
 
-# vector indices for flat matrices
-idx = [
-    m.n_x,
-    m.n_x * (1 + m.n_x),
-    m.n_x * (1 + m.n_x + m.n_u),
-    m.n_x * (1 + m.n_x + m.n_u + m.n_u),
-    m.n_x * (1 + m.n_x + m.n_u + m.n_u + 1),
-    m.n_x * (1 + m.n_x + m.n_u + m.n_u + 2),
-]
-
 # CVX ------------------------------------------------------------------------------------------------------------------
 print("Setting up problem.")
 # Variables:
