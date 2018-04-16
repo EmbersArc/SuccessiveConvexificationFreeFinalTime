@@ -40,8 +40,8 @@ class Model_6DoF:
     t_f_guess = 3  # 10s
 
     # State constraints
-    r_I_init = np.array((3., 2., 1))  # 2000m, 200m, 200m
-    v_I_init = np.array((0, -1, -1))  # -300m/s, 50m/s, 50m/s
+    r_I_init = np.array((3., -2., -1))  # 2000m, 200m, 200m
+    v_I_init = np.array((0, 1, 1))  # -300m/s, 50m/s, 50m/s
     q_B_I_init = np.array((1.0, 0.0, 0.0, 0.0))
     w_B_init = np.array((0., 0., 0.))
 

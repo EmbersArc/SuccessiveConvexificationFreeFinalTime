@@ -1,16 +1,28 @@
 import pickle
+import time
 import numpy as np
 import cvxpy as cvx
-from scipy.integrate import odeint
-from visualization.plot3d import plot3d
 
 from model_6dof import Model_6DoF
 from parameters import *
+from discretization import Discretize
+from visualization.plot3d import plot3d
 
 m = Model_6DoF()
 
+# state and input
 X = np.empty(shape=[m.n_x, K])
 U = np.empty(shape=[m.n_u, K])
+
+# vector indices for flat matrices
+idx = [
+    m.n_x,
+    m.n_x * (1 + m.n_x),
+    m.n_x * (1 + m.n_x + m.n_u),
+    m.n_x * (1 + m.n_x + m.n_u + m.n_u),
+    m.n_x * (1 + m.n_x + m.n_u + m.n_u + 1),
+    m.n_x * (1 + m.n_x + m.n_u + m.n_u + 2),
+]
 
 # CVX ------------------------------------------------------------------------------------------------------------------
 print("Setting up problem.")
@@ -75,71 +87,25 @@ print("Problem is " + ("valid." if prob.is_dcp() else "invalid."))
 sigma = m.t_f_guess
 m.initialize(X, U)
 
-f, A, B = m.get_equations()
-
-
-# ODE function to compute dVdt
-# V = [x(14), Phi_A(14x14), B_bar(14x3), C_bar(14x3), Simga_bar(14), z_bar(14)]
-def ode_dVdt(V, t, u_t, u_t1, sigma):
-    alpha = t / dt
-    beta = 1 - alpha
-    dVdt = np.empty((14 + 14 * 14 + 14 * 3 + 14 * 3 + 14 + 14,))
-    x = V[0:14]
-    u = u_t + alpha * (u_t1 - u_t)
-
-    # using \Phi_A(\tau_{k+1},\xi) = \Phi_A(\tau_{k+1},\tau_k)\Phi_A(\xi,\tau_k)^{-1}
-    # and pre-multiplying with \Phi_A(\tau_{k+1},\tau_k) after integration
-    Phi_A_xi = np.linalg.inv(V[14:210].reshape((14, 14)))
-
-    A_subs = sigma * A(x, u)
-    B_subs = sigma * B(x, u)
-    f_subs = f(x, u)
-
-    dVdt[0:14] = sigma * f_subs.transpose()
-    dVdt[14:210] = np.matmul(A_subs, V[14:210].reshape((14, 14))).reshape(-1)
-    dVdt[210:252] = np.matmul(Phi_A_xi, B_subs).reshape(-1) * alpha
-    dVdt[252:294] = np.matmul(Phi_A_xi, B_subs).reshape(-1) * beta
-    dVdt[294:308] = np.matmul(Phi_A_xi, f_subs).transpose()
-    z_t = -np.matmul(A_subs, x) - np.matmul(B_subs, u)
-    dVdt[308:322] = np.matmul(Phi_A_xi, z_t)
-
-    return dVdt
-
-
-A_bar = np.zeros([m.n_x * m.n_x, K - 1])
-B_bar = np.zeros([m.n_x * m.n_u, K - 1])
-C_bar = np.zeros([m.n_x * m.n_u, K - 1])
-Sigma_bar = np.zeros([m.n_x, K - 1])
-z_bar = np.zeros([m.n_x, K - 1])
-
-# integration initial condition
-V0 = np.zeros((322,))
-V0[m.n_x:210] = np.eye(m.n_x).reshape(-1)
-
 # START SUCCESSIVE CONVEXIFICATION--------------------------------------------------------------------------------------
 all_X = [X]
 all_U = [U]
 
+disc = Discretize(m, dt, K)
+
 for it in range(iterations):
+    t0_it = time.time()
     print("\n")
     print("------------------")
     print("-- Iteration", str(it + 1).zfill(2), "--")
     print("------------------")
 
     print("Calculating new transition matrices.")
-    for k in range(0, K - 1):
-        # find A_bar, B_bar, C_bar, Sigma_bar, z_bar
-        V0[0:m.n_x] = X[:, k]
-        V = np.array(odeint(ode_dVdt, V0, (0, dt), args=(U[:, k], U[:, k + 1], sigma)))[1, :]
-        # using \Phi_A(\tau_{k+1},\xi) = \Phi_A(\tau_{k+1},\tau_k)\Phi_A(\xi,\tau_k)^{-1}
-        Phi = V[m.n_x:210].reshape((m.n_x, m.n_x))
-        A_bar[:, k] = V[m.n_x:210].reshape((m.n_x, m.n_x)).flatten(order='F')
-        B_bar[:, k] = np.matmul(Phi, V[210:252].reshape((m.n_x, m.n_u))).flatten(order='F')
-        C_bar[:, k] = np.matmul(Phi, V[252:294].reshape((m.n_x, m.n_u))).flatten(order='F')
-        Sigma_bar[:, k] = np.matmul(Phi, V[294:308])
-        z_bar[:, k] = np.matmul(Phi, V[308:322])
+    t0_tm = time.time()
+    A_bar, B_bar, C_bar, Sigma_bar, z_bar = disc.calculate(X, U, sigma)
+    t_it = time.time() - t0_tm
 
-    # CVX ----------------------------------------------------------------------------------------------------------
+    # CVX --------------------------------------------------------------------------------------------------------------
     # pass parameters to model (CVXPY uses Fortran order)
     A_bar_.value = A_bar
     B_bar_.value = B_bar
@@ -154,14 +120,20 @@ for it in range(iterations):
     w_delta_sigma_.value = w_delta_sigma
 
     print("Solving problem.")
-
     try:
         prob.solve(verbose=True, solver='ECOS', max_iters=100)
     except cvx.error.SolverError:
         # can sometimes ignore a solver error
         pass
-    # CVX ----------------------------------------------------------------------------------------------------------
 
+    info = prob.solver_stats
+    print("Time for transition matrices:", t_it)
+    print("Time for setup:", info.setup_time)
+    print("Time for solver:", info.solve_time)
+    print("Time for iteration:", time.time() - t0_it)
+    print("\n")
+
+    # CVX --------------------------------------------------------------------------------------------------------------
     # update values
     X = X_.value
     U = U_.value
