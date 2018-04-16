@@ -98,9 +98,9 @@ class Model_6DoF:
         A = f.jacobian(x)
         B = f.jacobian(u)
 
-        f_lambda = lambdify((x, u), f, "numpy")
-        A_lambda = lambdify((x, u), A, "numpy")
-        B_lambda = lambdify((x, u), B, "numpy")
+        f = lambdify((x, u), f, "numpy")
+        A = lambdify((x, u), A, "numpy")
+        B = lambdify((x, u), B, "numpy")
 
         return f_lambda, A_lambda, B_lambda
 
