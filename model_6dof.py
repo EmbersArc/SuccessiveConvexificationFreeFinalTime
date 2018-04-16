@@ -76,19 +76,24 @@ class Model_6DoF:
     # Fuel consumption
     alpha_m = 0.005  # 1 / (282s * 9.81m/s^2))
 
+    # ------------------------------------------ Start normalization stuff
+
     def __init__(self):
         self.r_scale = self.r_I_init[0]
         self.m_scale = self.m_wet
 
-    def parm_nondim(self, parms):
+        self.parm_nondim()
+        self.nondim_boundaries()
+
+    def parm_nondim(self):
 
         ''' nondimensionalize all parameters '''
 
-        self.alpha_m = self.alpha_m  * self.r_scale  # s/m * m/Ul = s/Ul
-        self.rTB     = self.r_T_B   / self.r_scale
-        self.g_I     = self.g_I    / self.r_scale
-        self.J       = self.J_B_I / (self.m_scale * self.r_scale**2)
-        self.rA      = self.r_A  / self.r_scale
+        self.alpha_m /= self.alpha_m  * self.r_scale  # s/m * m/Ul = s/Ul
+        self.r_T_B   /= self.r_scale
+        self.g_I     /= self.g_I    / self.r_scale
+        self.J_B   /= self.J_B / (self.m_scale * self.r_scale**2)
+        self.r_A     /= self.r_A  / self.r_scale
 
         return parms
 
@@ -101,23 +106,24 @@ class Model_6DoF:
 
         return x
 
+    def nondim_boundaries(self, x_init, x_final):
+        self.x_init  = self.x_nondim(x_init)
+        self.x_final = self.x_nondim(x_final)
+
     def u_nondim(self, u):
         ''' nondimensionalize u, or in general any force in Newtons'''
         return u / (self.m_scale * self.r_scale)
 
-    def parm_redim(self, parms):
+    def parm_redim(self):
         ''' redimensionalize all variables (for plotting or whatever)'''
 
-        self.alpha_m = self.alpha_m / self.r_scale
-        self.rTB     = self.r_T_B   * self.r_scale
-        self.g_I     = self.g_I    * self.r_scale
-        self.J       = self.J_B_I * (self.m_scale * self.r_scale**2)
-        self.rA      = self.r_A  * self.r_scale
-
-        return parms
+        self.alpha_m *= self.alpha_m  * self.r_scale  # s/m * m/Ul = s/Ul
+        self.r_T_B   *= self.r_scale
+        self.g_I     *= self.g_I    / self.r_scale
+        self.J_B   *= self.J_B / (self.m_scale * self.r_scale**2)
 
     def x_redim(self, x):
-        ''' redimensionalize x'''
+        ''' redimensionalize x, assumed to have >1 rows '''
 
         x[:, 0]   *= self.m_scale
         x[:, 1:4] *= self.r_scale
@@ -126,8 +132,11 @@ class Model_6DoF:
         return x
 
     def u_redim(self, u):
-        ''' redimensionalize u'''
-        return u * self.m_scale * self.r_scale
+        ''' redimensionalize u '''
+        return u * (self.m_scale * self.r_scale)
+
+
+    # ------------------------------------------ End normalization stuff
 
     def get_equations(self):
         f = zeros(14, 1)
