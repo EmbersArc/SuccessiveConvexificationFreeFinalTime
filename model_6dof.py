@@ -80,7 +80,7 @@ class Model_6DoF:
 
     def __init__(self):
 
-        self.r_scale = self.r_I_init[0]
+        self.r_scale = 1#self.r_I_init[0]
         self.m_scale = self.m_wet
 
         self.parm_nondim()
