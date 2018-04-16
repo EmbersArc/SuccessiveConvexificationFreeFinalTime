@@ -76,6 +76,59 @@ class Model_6DoF:
     # Fuel consumption
     alpha_m = 0.005  # 1 / (282s * 9.81m/s^2))
 
+    def __init__(self):
+        self.r_scale = self.r_I_init[0]
+        self.m_scale = self.m_wet
+
+    def parm_nondim(self, parms):
+
+        ''' nondimensionalize all parameters '''
+
+        self.alpha_m = self.alpha_m  * self.r_scale  # s/m * m/Ul = s/Ul
+        self.rTB     = self.r_T_B   / self.r_scale
+        self.g_I     = self.g_I    / self.r_scale
+        self.J       = self.J_B_I / (self.m_scale * self.r_scale**2)
+        self.rA      = self.r_A  / self.r_scale
+
+        return parms
+
+    def x_nondim(self, x):
+        ''' nondimensionalize a single x row '''
+
+        x[0]   /= self.m_scale
+        x[1:4] /= self.r_scale
+        x[4:7] /= self.r_scale
+
+        return x
+
+    def u_nondim(self, u):
+        ''' nondimensionalize u, or in general any force in Newtons'''
+        return u / (self.m_scale * self.r_scale)
+
+    def parm_redim(self, parms):
+        ''' redimensionalize all variables (for plotting or whatever)'''
+
+        self.alpha_m = self.alpha_m / self.r_scale
+        self.rTB     = self.r_T_B   * self.r_scale
+        self.g_I     = self.g_I    * self.r_scale
+        self.J       = self.J_B_I * (self.m_scale * self.r_scale**2)
+        self.rA      = self.r_A  * self.r_scale
+
+        return parms
+
+    def x_redim(self, x):
+        ''' redimensionalize x'''
+
+        x[:, 0]   *= self.m_scale
+        x[:, 1:4] *= self.r_scale
+        x[:, 4:7] *= self.r_scale
+
+        return x
+
+    def u_redim(self, u):
+        ''' redimensionalize u'''
+        return u * self.m_scale * self.r_scale
+
     def get_equations(self):
         f = zeros(14, 1)
 
@@ -98,11 +151,11 @@ class Model_6DoF:
         A = f.jacobian(x)
         B = f.jacobian(u)
 
-        f = lambdify((x, u), f, "numpy")
-        A = lambdify((x, u), A, "numpy")
-        B = lambdify((x, u), B, "numpy")
+        f_func = lambdify((x, u), f, "numpy")
+        A_func = lambdify((x, u), A, "numpy")
+        B_func = lambdify((x, u), B, "numpy")
 
-        return f_lambda, A_lambda, B_lambda
+        return f_func, A_func, B_func
 
     def initialize(self, X, U):
         print("Starting Initialization.")
