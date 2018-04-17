@@ -29,6 +29,7 @@ def omega(w):
 
 
 class Model_6DoF:
+
     n_x = 14
     n_u = 3
 
@@ -80,19 +81,27 @@ class Model_6DoF:
 
     def __init__(self):
 
-        self.r_scale = 1#self.r_I_init[0]
-        self.m_scale = self.m_wet
+        # a large r_scale for a small scale problem will
+        #  lead to numerical problems as parameters become excessively small
+        #  and (it seems) precision is lost in the dynamics
 
-        self.parm_nondim()
-        self.nondim_boundaries()
+        self.r_scale = abs(float(self.r_I_init[0]))
+        self.m_scale = abs(float(self.m_wet))
 
-    def parm_nondim(self):
-        ''' nondimensionalize all parameters '''
+        self.nondimensionalize()
+
+    def nondimensionalize(self):
+        ''' nondimensionalize all parameters and boundaries '''
+
+        print('Nondimensionalizing...')
 
         self.alpha_m /= self.r_scale  # s/m * m/Ul = s/Ul
         self.r_T_B   /= self.r_scale
         self.g_I     /= self.r_scale
         self.J_B     /= (self.m_scale * self.r_scale**2)
+
+        self.x_init  = self.x_nondim(self.x_init)
+        self.x_final = self.x_nondim(self.x_final)
 
         self.T_max = self.u_nondim(self.T_max)
         self.T_min = self.u_nondim(self.T_min)
@@ -103,22 +112,18 @@ class Model_6DoF:
     def x_nondim(self, x):
         ''' nondimensionalize a single x row '''
 
-        x[0]   /= self.m_scale
+        x[ 0 ] /= self.m_scale
         x[1:4] /= self.r_scale
         x[4:7] /= self.r_scale
 
         return x
 
-    def nondim_boundaries(self):
-        self.x_init  = self.x_nondim(self.x_init)
-        self.x_final = self.x_nondim(self.x_final)
-
     def u_nondim(self, u):
         ''' nondimensionalize u, or in general any force in Newtons'''
         return u / (self.m_scale * self.r_scale)
 
-    def parm_redim(self):
-        ''' redimensionalize all variables (for plotting or whatever)'''
+    def redimensionalize(self):
+        ''' redimensionalize all parameters '''
 
         self.alpha_m *= self.r_scale  # s/m * m/Ul = s/Ul
         self.r_T_B   *= self.r_scale
@@ -132,7 +137,7 @@ class Model_6DoF:
         self.m_dry *= self.m_scale
 
     def x_redim(self, x):
-        ''' redimensionalize x, assumed to have >1 rows '''
+        ''' redimensionalize x, assumed to have the shape of a solution '''
 
         x[:, 0]   *= self.m_scale
         x[:, 1:4] *= self.r_scale
