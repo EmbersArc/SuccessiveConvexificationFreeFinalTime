@@ -29,20 +29,19 @@ def omega(w):
 
 
 class Model_6DoF:
-
     n_x = 14
     n_u = 3
 
     # Mass
-    m_wet = 2  # 33000kg
-    m_dry = 1  # 26000kg
+    m_wet = 30000  # 30000kg
+    m_dry = 22000  # 22000kg
 
     # Flight time guess
-    t_f_guess = 3  # 10s
+    t_f_guess = 10  # 10s
 
     # State constraints
-    r_I_init = np.array((3., -2., -1))  # 2000m, 200m, 200m
-    v_I_init = np.array((0, 1, 1))  # -300m/s, 50m/s, 50m/s
+    r_I_init = np.array((1500., -200., -200))  # 2000m, 200m, 200m
+    v_I_init = np.array((-100., 10., 10.))  # -300m/s, 50m/s, 50m/s
     q_B_I_init = np.array((1.0, 0.0, 0.0, 0.0))
     w_B_init = np.array((0., 0., 0.))
 
@@ -62,26 +61,25 @@ class Model_6DoF:
     tan_gamma_gs = np.tan(np.deg2rad(20))
 
     # Thrust limits
-    T_max = 5  # 845000 kg*m/s^2
-    T_min = 0.3
+    T_max = 845000  # 845000 kg*m/s^2
+    T_min = 0.3 * 845000
 
     # Angular moment of inertia
-    J_B = np.diag((1e-2, 1e-2, 1e-2))  # 4500000kg*m^2, 4500000kg*m^2, 100000kg*m^2
+    J_B = np.diag((100000., 4000000., 4000000.))  # 100000kg*m^2, 4000000kg*m^2, 4000000kg*m^2
 
     # Vector from thrust point to CoM
-    r_T_B = np.array((-1e-2, 0., 0.))  # -20m
+    r_T_B = np.array((-20., 0., 0.))  # -20m
 
     # Gravity
-    g_I = np.array((-1, 0., 0.))  # -9.81 m/s^2
+    g_I = np.array((-9.81, 0., 0.))  # -9.81 m/s^2
 
     # Fuel consumption
-    alpha_m = 0.005  # 1 / (282s * 9.81m/s^2))
+    alpha_m = 1 / (282 * 9.81)  # 1 / (282s * 9.81m/s^2))
 
     # ------------------------------------------ Start normalization stuff
 
     def __init__(self):
-
-        # a large r_scale for a small scale problem will
+        #  a large r_scale for a small scale problem will
         #  lead to numerical problems as parameters become excessively small
         #  and (it seems) precision is lost in the dynamics
 
@@ -91,16 +89,16 @@ class Model_6DoF:
         self.nondimensionalize()
 
     def nondimensionalize(self):
-        ''' nondimensionalize all parameters and boundaries '''
+        """ nondimensionalize all parameters and boundaries """
 
         print('Nondimensionalizing...')
 
         self.alpha_m /= self.r_scale  # s/m * m/Ul = s/Ul
-        self.r_T_B   /= self.r_scale
-        self.g_I     /= self.r_scale
-        self.J_B     /= (self.m_scale * self.r_scale**2)
+        self.r_T_B /= self.r_scale
+        self.g_I /= self.r_scale
+        self.J_B /= (self.m_scale * self.r_scale ** 2)
 
-        self.x_init  = self.x_nondim(self.x_init)
+        self.x_init = self.x_nondim(self.x_init)
         self.x_final = self.x_nondim(self.x_final)
 
         self.T_max = self.u_nondim(self.T_max)
@@ -110,25 +108,25 @@ class Model_6DoF:
         self.m_dry /= self.m_scale
 
     def x_nondim(self, x):
-        ''' nondimensionalize a single x row '''
+        """ nondimensionalize a single x row """
 
-        x[ 0 ] /= self.m_scale
+        x[0] /= self.m_scale
         x[1:4] /= self.r_scale
         x[4:7] /= self.r_scale
 
         return x
 
     def u_nondim(self, u):
-        ''' nondimensionalize u, or in general any force in Newtons'''
+        """ nondimensionalize u, or in general any force in Newtons"""
         return u / (self.m_scale * self.r_scale)
 
     def redimensionalize(self):
-        ''' redimensionalize all parameters '''
+        """ redimensionalize all parameters """
 
         self.alpha_m *= self.r_scale  # s/m * m/Ul = s/Ul
-        self.r_T_B   *= self.r_scale
-        self.g_I     *= self.r_scale
-        self.J_B     *= (self.m_scale * self.r_scale**2)
+        self.r_T_B *= self.r_scale
+        self.g_I *= self.r_scale
+        self.J_B *= (self.m_scale * self.r_scale ** 2)
 
         self.T_max = self.u_redim(self.T_max)
         self.T_min = self.u_redim(self.T_min)
@@ -137,23 +135,21 @@ class Model_6DoF:
         self.m_dry *= self.m_scale
 
     def x_redim(self, x):
-        ''' redimensionalize x, assumed to have the shape of a solution '''
+        """ redimensionalize x, assumed to have the shape of a solution """
 
-        x[:, 0]   *= self.m_scale
+        x[:, 0] *= self.m_scale
         x[:, 1:4] *= self.r_scale
         x[:, 4:7] *= self.r_scale
 
         return x
 
     def u_redim(self, u):
-        ''' redimensionalize u '''
+        """ redimensionalize u """
         return u * (self.m_scale * self.r_scale)
-
 
     # ------------------------------------------ End normalization stuff
 
     def get_equations(self):
-
         f = zeros(14, 1)
 
         x = Matrix(symbols('m rx ry rz vx vy vz q0 q1 q2 q3 wx wy wz', real=True))
@@ -187,7 +183,6 @@ class Model_6DoF:
         K = X.shape[1]
 
         for k in range(K):
-
             alpha1 = (K - k) / K
             alpha2 = k / K
 
