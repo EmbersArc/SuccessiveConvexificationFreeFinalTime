@@ -33,15 +33,15 @@ class Model_6DoF:
     n_u = 3
 
     # Mass
-    m_wet = 30000  # 30000kg
-    m_dry = 22000  # 22000kg
+    m_wet = 2.  # 30000kg
+    m_dry = 1.  # 22000kg
 
     # Flight time guess
-    t_f_guess = 10  # 10s
+    t_f_guess = 1  # 10s
 
     # State constraints
-    r_I_init = np.array((1500., -200., -200))  # 2000m, 200m, 200m
-    v_I_init = np.array((-100., 10., 10.))  # -300m/s, 50m/s, 50m/s
+    r_I_init = np.array((10., 5., 2))  # 2000m, 200m, 200m
+    v_I_init = np.array((-3., -1., -1.))  # -300m/s, 50m/s, 50m/s
     q_B_I_init = np.array((1.0, 0.0, 0.0, 0.0))
     w_B_init = np.array((0., 0., 0.))
 
@@ -61,20 +61,20 @@ class Model_6DoF:
     tan_gamma_gs = np.tan(np.deg2rad(20))
 
     # Thrust limits
-    T_max = 845000  # 845000 kg*m/s^2
-    T_min = 0.3 * 845000
+    T_max = 5  # 845000 kg*m/s^2
+    T_min = 0.3
 
     # Angular moment of inertia
-    J_B = np.diag((100000., 4000000., 4000000.))  # 100000kg*m^2, 4000000kg*m^2, 4000000kg*m^2
+    J_B = np.diag((1e-2, 1e-2, 1e-2))  # 100000kg*m^2, 4000000kg*m^2, 4000000kg*m^2
 
     # Vector from thrust point to CoM
-    r_T_B = np.array((-20., 0., 0.))  # -20m
+    r_T_B = np.array((-1e-2, 0., 0.))  # -20m
 
     # Gravity
-    g_I = np.array((-9.81, 0., 0.))  # -9.81 m/s^2
+    g_I = np.array((-1, 0., 0.))  # -9.81 m/s^2
 
     # Fuel consumption
-    alpha_m = 1 / (282 * 9.81)  # 1 / (282s * 9.81m/s^2))
+    alpha_m = 0.01  # 1 / (282s * 9.81m/s^2))
 
     # ------------------------------------------ Start normalization stuff
 
@@ -86,7 +86,7 @@ class Model_6DoF:
         self.r_scale = abs(float(self.r_I_init[0]))
         self.m_scale = abs(float(self.m_wet))
 
-        self.nondimensionalize()
+        # self.nondimensionalize()
 
     def nondimensionalize(self):
         """ nondimensionalize all parameters and boundaries """

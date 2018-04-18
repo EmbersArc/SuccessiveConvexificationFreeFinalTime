@@ -8,6 +8,7 @@ class Discretize:
         self.m = m
         self.n_x = m.n_x
         self.n_u = m.n_u
+
         self.A_bar = np.zeros([m.n_x * m.n_x, K - 1])
         self.B_bar = np.zeros([m.n_x * m.n_u, K - 1])
         self.C_bar = np.zeros([m.n_x * m.n_u, K - 1])
@@ -33,7 +34,7 @@ class Discretize:
 
     def calculate(self, X, U, sigma):
         for k in range(self.K - 1):
-            self.V0[0:self.n_x] = X[:, k]
+            self.V0[self.x_ind] = X[:, k]
             V = np.array(odeint(self.ode_dVdt, self.V0, (0, self.dt), args=(U[:, k], U[:, k + 1], sigma)))[1, :]
 
             # using \Phi_A(\tau_{k+1},\xi) = \Phi_A(\tau_{k+1},\tau_k)\Phi_A(\xi,\tau_k)^{-1}
@@ -44,6 +45,7 @@ class Discretize:
             self.C_bar[:, k] = np.matmul(Phi, V[self.C_bar_ind].reshape((self.n_x, self.n_u))).flatten(order='F')
             self.Sigma_bar[:, k] = np.matmul(Phi, V[self.Sigma_bar_ind])
             self.z_bar[:, k] = np.matmul(Phi, V[self.z_bar_ind])
+
         return self.A_bar, self.B_bar, self.C_bar, self.Sigma_bar, self.z_bar
 
     # ODE function to compute dVdt

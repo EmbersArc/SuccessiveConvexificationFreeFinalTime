@@ -51,15 +51,25 @@ constraints += [
     for k in range(K - 1)
 ]
 
-# Trust regions:
-dx = X_ - X_last_
-du = U_ - U_last_
-ds = sigma_ - sigma_last_
-constraints += [
-    cvx.square(cvx.norm(dx, axis=0)) + cvx.square(cvx.norm(du, axis=0)) <= delta_,
-    cvx.norm(ds) <= delta_s_
-]
+# # Trust regions:
+# dx = X_ - X_last_
+# du = U_ - U_last_
+# constraints += [
+#     cvx.sum(cvx.square(dx), axis=0) + cvx.sum(cvx.square(du), axis=0) <= delta_,
+# ]
 
+# is somehow different than
+
+# Trust regions:
+for k in range(K):
+    dx = X_[:, k] - X_last_[:, k]
+    du = U_[:, k] - U_last_[:, k]
+    constraints += [cvx.sum_squares(dx) + cvx.sum_squares(du) <= delta_[k]]
+
+ds = sigma_ - sigma_last_
+constraints += [cvx.square(ds) <= delta_s_]
+
+# Model constraints:
 constraints += m.get_constraints(X_, U_, X_last_, U_last_)
 
 # Objective:
@@ -111,7 +121,7 @@ for it in range(iterations):
 
     print("Solving problem.")
     try:
-        prob.solve(verbose=True, solver='ECOS', max_iters=100)
+        prob.solve(verbose=True, solver='ECOS')
     except cvx.error.SolverError:
         # can sometimes ignore a solver error
         pass
