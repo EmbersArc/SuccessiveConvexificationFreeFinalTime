@@ -1,5 +1,6 @@
 import numpy as np
 from scipy.integrate import odeint
+from numba import jit
 
 
 class Discretize:
@@ -35,7 +36,7 @@ class Discretize:
     def calculate(self, X, U, sigma):
         for k in range(self.K - 1):
             self.V0[self.x_ind] = X[:, k]
-            V = np.array(odeint(self.ode_dVdt, self.V0, (0, self.dt), args=(U[:, k], U[:, k + 1], sigma)))[1, :]
+            V = np.array(odeint(self.ode_dVdt, self.V0, (0, self.dt), args=(U[:, k], U[:, k + 1], sigma))[1, :])
 
             # using \Phi_A(\tau_{k+1},\xi) = \Phi_A(\tau_{k+1},\tau_k)\Phi_A(\xi,\tau_k)^{-1}
             # flatten matrices in column-major (Fortran) order for CVXPY
@@ -49,7 +50,7 @@ class Discretize:
         return self.A_bar, self.B_bar, self.C_bar, self.Sigma_bar, self.z_bar
 
     # ODE function to compute dVdt
-    # V = [x(14), Phi_A(14x14), B_bar(14x3), C_bar(14x3), Simga_bar(14), z_bar(14)]
+    # V = [x, Phi_A, B_bar, C_bar, Simga_bar, z_bar]
     def ode_dVdt(self, V, t, u_t, u_t1, sigma):
         alpha = t / self.dt
         beta = 1 - alpha

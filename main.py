@@ -7,6 +7,7 @@ from model_6dof import Model_6DoF
 from parameters import *
 from discretization import Discretize
 from visualization.plot3d import plot3d
+from scproblem import SCProblem
 
 m = Model_6DoF()
 
@@ -14,76 +15,7 @@ m = Model_6DoF()
 X = np.empty(shape=[m.n_x, K])
 U = np.empty(shape=[m.n_u, K])
 
-# CVX ------------------------------------------------------------------------------------------------------------------
-print("Setting up problem.")
-# Variables:
-X_ = cvx.Variable((m.n_x, K))
-U_ = cvx.Variable((m.n_u, K))
-sigma_ = cvx.Variable()
-nu_ = cvx.Variable((m.n_x * (K - 1)))
-delta_ = cvx.Variable(K)
-delta_s_ = cvx.Variable()
-
-# Parameters:
-A_bar_ = cvx.Parameter((m.n_x * m.n_x, K - 1))
-B_bar_ = cvx.Parameter((m.n_x * m.n_u, K - 1))
-C_bar_ = cvx.Parameter((m.n_x * m.n_u, K - 1))
-Sigma_bar_ = cvx.Parameter((m.n_x, K - 1))
-z_bar_ = cvx.Parameter((m.n_x, K - 1))
-X_last_ = cvx.Parameter((m.n_x, K))
-U_last_ = cvx.Parameter((m.n_u, K))
-sigma_last_ = cvx.Parameter(nonneg=True)
-w_delta_ = cvx.Parameter(nonneg=True)
-w_nu_ = cvx.Parameter(nonneg=True)
-w_delta_sigma_ = cvx.Parameter(nonneg=True)
-
-constraints = []
-
-# Dynamics:
-constraints += [
-    X_[:, k + 1] ==
-    cvx.reshape(A_bar_[:, k], (m.n_x, m.n_x)) * X_[:, k]
-    + cvx.reshape(B_bar_[:, k], (m.n_x, m.n_u)) * U_[:, k]
-    + cvx.reshape(C_bar_[:, k], (m.n_x, m.n_u)) * U_[:, k + 1]
-    + Sigma_bar_[:, k] * sigma_
-    + z_bar_[:, k]
-    + nu_[k * m.n_x:(k + 1) * m.n_x]
-    for k in range(K - 1)
-]
-
-# # Trust regions:
-# dx = X_ - X_last_
-# du = U_ - U_last_
-# constraints += [
-#     cvx.sum(cvx.square(dx), axis=0) + cvx.sum(cvx.square(du), axis=0) <= delta_,
-# ]
-
-# is somehow different than
-
-# Trust regions:
-for k in range(K):
-    dx = X_[:, k] - X_last_[:, k]
-    du = U_[:, k] - U_last_[:, k]
-    constraints += [cvx.sum_squares(dx) + cvx.sum_squares(du) <= delta_[k]]
-
-ds = sigma_ - sigma_last_
-constraints += [cvx.square(ds) <= delta_s_]
-
-# Model constraints:
-constraints += m.get_constraints(X_, U_, X_last_, U_last_)
-
-# Objective:
-objective = cvx.Minimize(
-    sigma_ + w_nu_ * cvx.norm(nu_, 1) + w_delta_ * cvx.norm(delta_) + w_delta_sigma_ * cvx.norm(delta_s_, 1)
-)
-
-prob = cvx.Problem(objective, constraints)
-
-print("Problem is " + ("valid." if prob.is_dcp() else "invalid."))
-# CVX ------------------------------------------------------------------------------------------------------------------
-
 # INITIALIZATION--------------------------------------------------------------------------------------------------------
-
 sigma = m.t_f_guess
 m.initialize(X, U)
 
@@ -92,73 +24,55 @@ all_X = [X]
 all_U = [U]
 
 disc = Discretize(m, dt, K)
+prob = SCProblem(m, K)
 
 for it in range(iterations):
     t0_it = time.time()
-    print("\n")
-    print("------------------")
-    print("-- Iteration", str(it + 1).zfill(2), "--")
-    print("------------------")
+    print('\n')
+    print('------------------')
+    print(f'-- Iteration {str(it + 1).zfill(2)} --')
+    print('------------------')
 
-    print("Calculating new transition matrices.")
+    print('Calculating new transition matrices.')
     t0_tm = time.time()
     A_bar, B_bar, C_bar, Sigma_bar, z_bar = disc.calculate(X, U, sigma)
-    t_it = time.time() - t0_tm
+    t_tm = time.time() - t0_tm
+    print('Time for transition matrices:', t_tm)
 
-    # CVX --------------------------------------------------------------------------------------------------------------
-    # pass parameters to model (CVXPY uses Fortran order)
-    A_bar_.value = A_bar
-    B_bar_.value = B_bar
-    C_bar_.value = C_bar
-    Sigma_bar_.value = Sigma_bar
-    z_bar_.value = z_bar
-    X_last_.value = X
-    U_last_.value = U
-    sigma_last_.value = sigma
-    w_delta_.value = w_delta
-    w_nu_.value = w_nu
-    w_delta_sigma_.value = w_delta_sigma
+    # if it > 5:
+    #     w_delta *= 1.2
 
-    print("Solving problem.")
-    try:
-        prob.solve(verbose=True, solver='ECOS')
-    except cvx.error.SolverError:
-        # can sometimes ignore a solver error
-        pass
+    # pass parameters to model
+    prob.update_values(A_bar, B_bar, C_bar, Sigma_bar, z_bar, X, U, sigma, w_delta, w_nu, w_delta_sigma)
 
-    info = prob.solver_stats
-    print("Time for transition matrices:", t_it)
-    print("Time for setup:", info.setup_time)
-    print("Time for solver:", info.solve_time)
-    print("Time for iteration:", time.time() - t0_it)
-    print("\n")
+    print('Solving problem.')
+    prob.solve(verbose=True, solver='MOSEK')
+    print(prob.get_solver_stats())
 
-    # CVX --------------------------------------------------------------------------------------------------------------
+    print('Time for iteration:', time.time() - t0_it)
+
     # update values
-    X = X_.value
-    U = U_.value
-    sigma = sigma_.value
+    X, U, sigma = prob.get_solution()
 
     all_X.append(X)
     all_U.append(U)
 
+    converged = prob.check_convergence(delta_tol, nu_tol)
+
+    print(prob.get_convergence_info())
+
     # print status
-    delta_norm = np.linalg.norm(delta_.value)
-    nu_norm = np.linalg.norm(nu_.value, ord=1)
-    print("Flight time:", sigma_.value)
-    print("Delta_norm:", delta_norm)
-    print("Nu_norm:", nu_norm)
-    if delta_norm < delta_tol and nu_norm < nu_tol:
-        print("Converged after", it + 1, "iterations.")
+    if converged:
+        print('Converged after', it + 1, 'iterations.')
         break
 
 all_X = np.stack(all_X)
 all_U = np.stack(all_U)
 
 # save trajectory to file for visualization
-pickle.dump(all_X, open("visualization/trajectory/X.p", "wb"))
-pickle.dump(all_U, open("visualization/trajectory/U.p", "wb"))
-pickle.dump(sigma, open("visualization/trajectory/sigma.p", "wb"))
+pickle.dump(all_X, open('visualization/trajectory/X.p', 'wb'))
+pickle.dump(all_U, open('visualization/trajectory/U.p', 'wb'))
+pickle.dump(sigma, open('visualization/trajectory/sigma.p', 'wb'))
 
 # plot trajectory
 plot3d(all_X, all_U)

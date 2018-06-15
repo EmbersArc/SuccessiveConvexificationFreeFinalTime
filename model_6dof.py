@@ -33,20 +33,20 @@ class Model_6DoF:
     n_u = 3
 
     # Mass
-    m_wet = 2.  # 30000kg
-    m_dry = 1.  # 22000kg
+    m_wet = 30000.  # 30000 kg
+    m_dry = 22000.  # 22000 kg
 
     # Flight time guess
-    t_f_guess = 1  # 10s
+    t_f_guess = 7.  # 10 s
 
     # State constraints
-    r_I_init = np.array((10., 5., 2))  # 2000m, 200m, 200m
-    v_I_init = np.array((-3., -1., -1.))  # -300m/s, 50m/s, 50m/s
+    r_I_init = np.array((200., 100., 100.))  # 2000 m, 200 m, 200 m
+    v_I_init = np.array([-10., -50, -10])  # -300 m/s, 50 m/s, 50 m/s
     q_B_I_init = np.array((1.0, 0.0, 0.0, 0.0))
     w_B_init = np.array((0., 0., 0.))
 
     r_I_final = np.array((0., 0., 0.))
-    v_I_final = np.array((-1e-1, 0., 0.))
+    v_I_final = np.array((0., 0., 0.))
     q_B_I_final = np.array((1.0, 0.0, 0.0, 0.0))
     w_B_final = np.array((0., 0., 0.))
 
@@ -56,47 +56,46 @@ class Model_6DoF:
     w_B_max = np.deg2rad(60)
 
     # Angles
-    cos_delta_max = np.cos(np.deg2rad(15))
+    tan_delta_max = np.tan(np.deg2rad(20))
     cos_theta_max = np.cos(np.deg2rad(90))
     tan_gamma_gs = np.tan(np.deg2rad(20))
 
     # Thrust limits
-    T_max = 5  # 845000 kg*m/s^2
-    T_min = 0.3
+    T_max = 845000.  # 845000 [kg*m/s^2]
+    T_min = 0.0
 
     # Angular moment of inertia
-    J_B = np.diag((1e-2, 1e-2, 1e-2))  # 100000kg*m^2, 4000000kg*m^2, 4000000kg*m^2
+    J_B = np.diag([100000., 4000000., 4000000.])  # 100000 [kg*m^2], 4000000 [kg*m^2], 4000000 [kg*m^2]
 
     # Vector from thrust point to CoM
-    r_T_B = np.array((-1e-2, 0., 0.))  # -20m
+    r_T_B = np.array([-20, 0., 0.])  # -20 m
 
     # Gravity
-    g_I = np.array((-1, 0., 0.))  # -9.81 m/s^2
+    g_I = np.array((-9.81, 0., 0.))  # -9.81 [m/s^2]
 
     # Fuel consumption
-    alpha_m = 0.01  # 1 / (282s * 9.81m/s^2))
+    alpha_m = 1 / (282 * 9.81)  # 1 / (282 * 9.81) [s/m]
 
     # ------------------------------------------ Start normalization stuff
-
     def __init__(self):
         #  a large r_scale for a small scale problem will
         #  lead to numerical problems as parameters become excessively small
         #  and (it seems) precision is lost in the dynamics
 
-        self.r_scale = abs(float(self.r_I_init[0]))
-        self.m_scale = abs(float(self.m_wet))
+        self.r_scale = self.r_I_init[0]
+        self.m_scale = self.m_wet
 
-        # self.nondimensionalize()
+        self.nondimensionalize()
 
     def nondimensionalize(self):
         """ nondimensionalize all parameters and boundaries """
 
         print('Nondimensionalizing...')
 
-        self.alpha_m /= self.r_scale  # s/m * m/Ul = s/Ul
-        self.r_T_B /= self.r_scale
-        self.g_I /= self.r_scale
-        self.J_B /= (self.m_scale * self.r_scale ** 2)
+        self.alpha_m *= self.r_scale  # s
+        self.r_T_B /= self.r_scale  # 1
+        self.g_I /= self.r_scale  # 1/s^2
+        self.J_B /= (self.m_scale * self.r_scale ** 2)  # 1
 
         self.x_init = self.x_nondim(self.x_init)
         self.x_final = self.x_nondim(self.x_final)
@@ -123,7 +122,7 @@ class Model_6DoF:
     def redimensionalize(self):
         """ redimensionalize all parameters """
 
-        self.alpha_m *= self.r_scale  # s/m * m/Ul = s/Ul
+        self.alpha_m /= self.r_scale  # s/m * m/Ul = s/Ul
         self.r_T_B *= self.r_scale
         self.g_I *= self.r_scale
         self.J_B *= (self.m_scale * self.r_scale ** 2)
@@ -197,21 +196,24 @@ class Model_6DoF:
 
         print("Initialization finished.")
 
-    def get_constraints(self, X_, U_, X_last_, U_last_):
-        K = X_.shape[1]
+    def get_objective(self, X_, U_, X_last_, U_last_):
+        objective = 0.1 * cvx.norm(X_[2:4, -1])
+        return objective
 
+    def get_constraints(self, X_, U_, X_last_, U_last_):
         # Boundary conditions:
         constraints = [
             X_[0, 0] == self.x_init[0],
             X_[1:4, 0] == self.x_init[1:4],
             X_[4:7, 0] == self.x_init[4:7],
-            # X_[0, 7:11] == x_init[7:11],  # initial attitude is free
+            X_[7:11, 0] == self.x_init[7:11],
             X_[11:14, 0] == self.x_init[11:14],
 
-            # X_[0, 0] == x_final[0], # final mass is free
-            X_[1:, K - 1] == self.x_final[1:],
-
-            U_[1:3, K - 1] == 0,
+            # X_[0, 0] == self.x_final[0], # final mass is free
+            X_[1, -1] == self.x_final[1],
+            # final y and z are free
+            X_[4:, -1] == self.x_final[4:],
+            U_[1:3, -1] == 0,
         ]
 
         constraints += [
@@ -222,12 +224,14 @@ class Model_6DoF:
             cvx.norm(X_[11: 14, :], axis=0) <= self.w_B_max,
 
             # Control constraints:
-            cvx.norm(U_, axis=0) <= U_[0, :] / self.cos_delta_max,
+            cvx.norm(U_[1:3, :], axis=0) <= self.tan_delta_max * U_[0, :],
             cvx.norm(U_, axis=0) <= self.T_max,
+            U_[0, :] >= 0
         ]
 
-        constraints += [
-            self.T_min <= U_last_[:, k] / cvx.norm(U_last_[:, k]) * U_[:, k] for k in range(K)
-        ]
+        # linearized minimum thrust
+        # constraints += [
+        # self.T_min <= U_last_[:, k] / cvx.norm(U_last_[:, k]) * U_[:, k] for k in range(K)
+        # ]
 
         return constraints
