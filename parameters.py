@@ -1,6 +1,5 @@
 # Trajectory points
 K = 50
-dt = 1 / (K - 1)
 
 # Max solver iterations
 iterations = 30

@@ -1,8 +1,14 @@
 import cvxpy as cvx
-import numpy as np
 
 
 class SCProblem:
+    """
+    Defines a standard Successive Convexification problem for a given model.
+
+    :param m: The model object
+    :param K: Number of discretization points
+    """
+
     def __init__(self, m, K):
         # Variables:
         self.X_v = cvx.Variable((m.n_x, K))
@@ -98,31 +104,32 @@ class SCProblem:
             self.prob.solve(**kwargs)
         except cvx.SolverError:
             pass
-        
+
+        stats = self.prob.solver_stats
+
+        info = {
+            "setup_time": stats.setup_time,
+            "solver_time": stats.solve_time
+        }
+
+        return info
+
     def get_solution(self):
         return self.X_v.value, self.U_v.value, self.sigma_v.value
 
-    def get_solver_stats(self):
-        info = self.prob.solver_stats
-        return f'''
-Time for setup: {info.setup_time}
-Time for solver: {info.solve_time}
-        '''
-
     def check_convergence(self, delta_tol, nu_tol):
 
-        converged = self.delta_norm_v.value < delta_tol and self.nu_norm_v < nu_tol
-
-        return converged
-
-    def get_convergence_info(self):
         if self.delta_norm_v.value is not None:
-            info = f'''
-Trust Region Norm: {self.delta_norm_v.value}
-Virtual Control Norm: {self.nu_norm_v.value}
-Total Time': {self.sigma_v.value}
-            '''
+            converged = self.delta_norm_v.value < delta_tol and self.nu_norm_v.value < nu_tol
+            info = {
+                "delta_norm": self.delta_norm_v.value,
+                "nu_norm": self.nu_norm_v.value,
+                "sigma": self.sigma_v.value
+            }
         else:
-            info = 'No solution available.'
+            converged = False
+            print("No solution available. Call solve() first.")
+            info = {}
 
-        return info
+        return converged, info
+

@@ -1,7 +1,5 @@
-import pickle
 import time
 import numpy as np
-import cvxpy as cvx
 
 from model_6dof import Model_6DoF
 from parameters import *
@@ -11,57 +9,68 @@ from scproblem import SCProblem
 
 m = Model_6DoF()
 
+
+def format_line(name, value, unit=""):
+    name += ":"
+    return f"{name.ljust(40)}{value:{0}.{2}}{unit}"
+
+
 # state and input
 X = np.empty(shape=[m.n_x, K])
 U = np.empty(shape=[m.n_u, K])
 
 # INITIALIZATION--------------------------------------------------------------------------------------------------------
 sigma = m.t_f_guess
-m.initialize(X, U)
+X, U = m.initialize_trajectory(X, U)
 
 # START SUCCESSIVE CONVEXIFICATION--------------------------------------------------------------------------------------
 all_X = [X]
 all_U = [U]
 
-disc = Discretize(m, dt, K)
+disc = Discretize(m, K)
 prob = SCProblem(m, K)
 
 for it in range(iterations):
     t0_it = time.time()
-    print('\n')
-    print('------------------')
-    print(f'-- Iteration {str(it + 1).zfill(2)} --')
-    print('------------------')
+    print('-' * 50)
+    print('-'*18 + f' Iteration {str(it + 1).zfill(2)} ' + '-'*18)
+    print('-' * 50)
 
-    print('Calculating new transition matrices.')
     t0_tm = time.time()
     A_bar, B_bar, C_bar, Sigma_bar, z_bar = disc.calculate(X, U, sigma)
-    t_tm = time.time() - t0_tm
-    print('Time for transition matrices:', t_tm)
+    print(format_line("Time for transition matrices", time.time() - t0_tm, "s"))
 
-    # if it > 5:
-    #     w_delta *= 1.2
+    w_delta *= 1.2
 
     # pass parameters to model
     prob.update_values(A_bar, B_bar, C_bar, Sigma_bar, z_bar, X, U, sigma, w_delta, w_nu, w_delta_sigma)
 
-    print('Solving problem.')
-    prob.solve(verbose=True, solver='MOSEK')
-    print(prob.get_solver_stats())
+    # solve problem
+    info = prob.solve(verbose=False, solver='ECOS')
 
-    print('Time for iteration:', time.time() - t0_it)
+    print(format_line("Setup Time", info["setup_time"], "s"))
+    print(format_line("Solver Time", info["solver_time"], "s"))
 
     # update values
     X, U, sigma = prob.get_solution()
 
+    # save solution for plotting
     all_X.append(X)
     all_U.append(U)
 
-    converged = prob.check_convergence(delta_tol, nu_tol)
+    # check if solution has converged
+    converged, info = prob.check_convergence(delta_tol, nu_tol)
 
-    print(prob.get_convergence_info())
+    print("\n")
+    print(format_line("Trust Region Cost", info["delta_norm"]))
+    print(format_line("Virtual Control Cost", info["nu_norm"]))
+    print(format_line("Total Time", info["sigma"]))
 
-    # print status
+    print("\n")
+    print(format_line("Time for iteration", time.time() - t0_it, "s"))
+
+    print("\n")
+
     if converged:
         print('Converged after', it + 1, 'iterations.')
         break
@@ -69,10 +78,12 @@ for it in range(iterations):
 all_X = np.stack(all_X)
 all_U = np.stack(all_U)
 
+print(all_X.shape)
+
 # save trajectory to file for visualization
-pickle.dump(all_X, open('visualization/trajectory/X.p', 'wb'))
-pickle.dump(all_U, open('visualization/trajectory/U.p', 'wb'))
-pickle.dump(sigma, open('visualization/trajectory/sigma.p', 'wb'))
+np.save('visualization/trajectory/X.npy', all_X)
+np.save('visualization/trajectory/U.npy', all_U)
+np.save('visualization/trajectory/sigma.npy', sigma)
 
 # plot trajectory
 plot3d(all_X, all_U)

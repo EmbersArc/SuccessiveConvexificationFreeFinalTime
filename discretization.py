@@ -1,10 +1,9 @@
 import numpy as np
 from scipy.integrate import odeint
-from numba import jit
 
 
 class Discretize:
-    def __init__(self, m, dt, K):
+    def __init__(self, m, K):
         self.K = K
         self.m = m
         self.n_x = m.n_x
@@ -30,10 +29,17 @@ class Discretize:
         self.V0 = np.zeros((m.n_x * (1 + m.n_x + m.n_u + m.n_u + 2),))
         self.V0[self.A_bar_ind] = np.eye(m.n_x).reshape(-1)
 
-        # vector indices for flat matrices
-        self.dt = dt
+        self.dt = 1 / (K - 1)
 
     def calculate(self, X, U, sigma):
+        """
+        Calculate discretization for given states, inputs and total time.
+
+        :param X: Matrix of states for all time points
+        :param U: Matrix of inputs for all time points
+        :param sigma: Total time
+        :return: The discretization matrices
+        """
         for k in range(self.K - 1):
             self.V0[self.x_ind] = X[:, k]
             V = np.array(odeint(self.ode_dVdt, self.V0, (0, self.dt), args=(U[:, k], U[:, k + 1], sigma))[1, :])
@@ -49,9 +55,17 @@ class Discretize:
 
         return self.A_bar, self.B_bar, self.C_bar, self.Sigma_bar, self.z_bar
 
-    # ODE function to compute dVdt
-    # V = [x, Phi_A, B_bar, C_bar, Simga_bar, z_bar]
     def ode_dVdt(self, V, t, u_t, u_t1, sigma):
+        """
+        ODE function to compute dVdt.
+
+        :param V: evaluation state V = [x, Phi_A, B_bar, C_bar, Simga_bar, z_bar]
+        :param t: evaluation time
+        :param u_t: input at start of interval
+        :param u_t1: input at end of interval
+        :param sigma: total time
+        :return: derivative at current time and state dVdt
+        """
         alpha = t / self.dt
         beta = 1 - alpha
         dVdt = np.empty((len(self.V0),))

@@ -49,14 +49,14 @@ def my_plot(fig, figures_i):
         Fx, Fy, Fz = np.dot(np.transpose(CBI), U_i[:, k])
         dx, dy, dz = np.dot(np.transpose(CBI), np.array([1., 0., 0.]))
 
-        # speed vector
-        ax.quiver(ry, rz, rx, vy, vz, vx, length=0.5, color='green')
+        # # speed vector
+        # ax.quiver(ry, rz, rx, vy, vz, vx, length=0.1, color='green')
 
         # attitude vector
-        ax.quiver(ry, rz, rx, dy, dz, dx, length=0.01, arrow_length_ratio=0.0, color='blue')
+        ax.quiver(ry, rz, rx, dy, dz, dx, length=0.05, arrow_length_ratio=0.0, color='blue')
 
         # thrust vector
-        ax.quiver(ry, rz, rx, -Fy, -Fz, -Fx, length=0.5, arrow_length_ratio=0.0, color='red')
+        ax.quiver(ry, rz, rx, -Fy, -Fz, -Fx, length=0.2, arrow_length_ratio=0.0, color='red')
 
     ax.axis('equal')
     ax.set_title("iter " + str(figures_i))
@@ -81,7 +81,7 @@ def plot3d(X_in, U_in):
 if __name__ == "__main__":
     import pickle
 
-    X_in = pickle.load(open("trajectory/X.p", "rb"))
-    U_in = pickle.load(open("trajectory/U.p", "rb"))
+    X_in = np.load("trajectory/X.npy")
+    U_in = np.load("trajectory/U.npy")
 
     plot3d(X_in, U_in)

@@ -29,19 +29,22 @@ def omega(w):
 
 
 class Model_6DoF:
+    """
+    A 6 degree of freedom rocket landing problem.
+    """
     n_x = 14
     n_u = 3
 
     # Mass
-    m_wet = 30000.  # 30000 kg
-    m_dry = 22000.  # 22000 kg
+    m_wet = 3.  # 30000 kg
+    m_dry = 1.  # 22000 kg
 
     # Flight time guess
     t_f_guess = 7.  # 10 s
 
     # State constraints
-    r_I_init = np.array((200., 100., 100.))  # 2000 m, 200 m, 200 m
-    v_I_init = np.array([-10., -50, -10])  # -300 m/s, 50 m/s, 50 m/s
+    r_I_init = np.array((4., 2., 1.))  # 2000 m, 200 m, 200 m
+    v_I_init = np.array([-1., -1, -1])  # -300 m/s, 50 m/s, 50 m/s
     q_B_I_init = np.array((1.0, 0.0, 0.0, 0.0))
     w_B_init = np.array((0., 0., 0.))
 
@@ -61,26 +64,28 @@ class Model_6DoF:
     tan_gamma_gs = np.tan(np.deg2rad(20))
 
     # Thrust limits
-    T_max = 845000.  # 845000 [kg*m/s^2]
+    T_max = 5.  # 845000 [kg*m/s^2]
     T_min = 0.0
 
     # Angular moment of inertia
-    J_B = np.diag([100000., 4000000., 4000000.])  # 100000 [kg*m^2], 4000000 [kg*m^2], 4000000 [kg*m^2]
+    J_B = np.diag([1e-2, 1e-2, 1e-2])  # 100000 [kg*m^2], 4000000 [kg*m^2], 4000000 [kg*m^2]
 
     # Vector from thrust point to CoM
-    r_T_B = np.array([-20, 0., 0.])  # -20 m
+    r_T_B = np.array([-1e-2, 0., 0.])  # -20 m
 
     # Gravity
-    g_I = np.array((-9.81, 0., 0.))  # -9.81 [m/s^2]
+    g_I = np.array((-1, 0., 0.))  # -9.81 [m/s^2]
 
     # Fuel consumption
-    alpha_m = 1 / (282 * 9.81)  # 1 / (282 * 9.81) [s/m]
+    alpha_m = 0.01  # 1 / (282 * 9.81) [s/m]
 
     # ------------------------------------------ Start normalization stuff
     def __init__(self):
-        #  a large r_scale for a small scale problem will
-        #  lead to numerical problems as parameters become excessively small
-        #  and (it seems) precision is lost in the dynamics
+        """
+        A large r_scale for a small scale problem will
+        ead to numerical problems as parameters become excessively small
+        and (it seems) precision is lost in the dynamics.
+        """
 
         self.r_scale = self.r_I_init[0]
         self.m_scale = self.m_wet
@@ -89,8 +94,6 @@ class Model_6DoF:
 
     def nondimensionalize(self):
         """ nondimensionalize all parameters and boundaries """
-
-        print('Nondimensionalizing...')
 
         self.alpha_m *= self.r_scale  # s
         self.r_T_B /= self.r_scale  # 1
@@ -149,6 +152,9 @@ class Model_6DoF:
     # ------------------------------------------ End normalization stuff
 
     def get_equations(self):
+        """
+        :return: Functions to calculate A, B and f
+        """
         f = zeros(14, 1)
 
         x = Matrix(symbols('m rx ry rz vx vy vz q0 q1 q2 q3 wx wy wz', real=True))
@@ -176,9 +182,14 @@ class Model_6DoF:
 
         return f_func, A_func, B_func
 
-    def initialize(self, X, U):
-        print("Starting Initialization.")
+    def initialize_trajectory(self, X, U):
+        """
+        Initialize the trajectory.
 
+        :param X: Numpy array of states to be initialized
+        :param U: Numpy array of inputs to be initialized
+        :return: The initialized X and U
+        """
         K = X.shape[1]
 
         for k in range(K):
@@ -194,13 +205,31 @@ class Model_6DoF:
             X[:, k] = np.concatenate((m_k, r_I_k, v_I_k, q_B_I_k, w_B_k))
             U[:, k] = m_k * -self.g_I
 
-        print("Initialization finished.")
+        return X, U
 
     def get_objective(self, X_, U_, X_last_, U_last_):
+        """
+        Get model specific objective to be minimzed.
+
+        :param X_: cvx variable for current states
+        :param U_: cvx variable for current inputs
+        :param X_last_: cvx parameter for last states
+        :param U_last_: cvx parameter for last inputs
+        :return: A cost function.
+        """
         objective = 0.1 * cvx.norm(X_[2:4, -1])
         return objective
 
     def get_constraints(self, X_, U_, X_last_, U_last_):
+        """
+        Get model specific constraints.
+
+        :param X_: cvx variable for current states
+        :param U_: cvx variable for current inputs
+        :param X_last_: cvx parameter for last states
+        :param U_last_: cvx parameter for last inputs
+        :return: A list of cvx constraints
+        """
         # Boundary conditions:
         constraints = [
             X_[0, 0] == self.x_init[0],
