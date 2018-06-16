@@ -29,12 +29,16 @@ class SCProblem:
         self.C_bar_p = cvx.Parameter((m.n_x * m.n_u, K - 1))
         self.Sigma_bar_p = cvx.Parameter((m.n_x, K - 1))
         self.z_bar_p = cvx.Parameter((m.n_x, K - 1))
+
         self.X_last_p = cvx.Parameter((m.n_x, K))
         self.U_last_p = cvx.Parameter((m.n_u, K))
         self.sigma_last_p = cvx.Parameter(nonneg=True)
+
         self.w_delta_p = cvx.Parameter(nonneg=True)
         self.w_nu_p = cvx.Parameter(nonneg=True)
         self.w_delta_sigma_p = cvx.Parameter(nonneg=True)
+
+        self.E_p = cvx.Parameter((m.n_x, m.n_x), nonneg=True)
 
         constraints = []
 
@@ -48,7 +52,7 @@ class SCProblem:
             + cvx.reshape(self.C_bar_p[:, k], (m.n_x, m.n_u)) * self.U_v[:, k + 1]
             + self.Sigma_bar_p[:, k] * self.sigma_v
             + self.z_bar_p[:, k]
-            + self.nu_v[:, k]
+            + self.E_p * self.nu_v[:, k]
             for k in range(K - 1)
         ]
         rhs = cvx.vstack(rhs)
@@ -75,7 +79,6 @@ class SCProblem:
             + self.w_delta_p * self.delta_norm_v
             + self.w_delta_sigma_p * self.delta_s_v
         )
-
         objective = sc_objective + model_objective
 
         # Flight time positive:
@@ -86,18 +89,22 @@ class SCProblem:
     def check_dcp(self):
         print('Problem is ' + ('valid.' if self.prob.is_dcp() else 'invalid.'))
 
-    def update_values(self, A_bar, B_bar, C_bar, Sigma_bar, z_bar, X, U, sigma, w_delta, w_nu, w_delta_sigma):
+    def update_values(self, A_bar, B_bar, C_bar, Sigma_bar, z_bar, X, U, sigma, w_delta, w_nu, w_delta_sigma, E):
         self.A_bar_p.value = A_bar
         self.B_bar_p.value = B_bar
         self.C_bar_p.value = C_bar
         self.Sigma_bar_p.value = Sigma_bar
         self.z_bar_p.value = z_bar
+
         self.X_last_p.value = X
         self.U_last_p.value = U
         self.sigma_last_p.value = sigma
+
         self.w_delta_p.value = w_delta
         self.w_nu_p.value = w_nu
         self.w_delta_sigma_p.value = w_delta_sigma
+
+        self.E_p.value = E
 
     def solve(self, **kwargs):
         error = False
@@ -105,7 +112,6 @@ class SCProblem:
             self.prob.solve(**kwargs)
         except cvx.SolverError:
             error = True
-            pass
 
         stats = self.prob.solver_stats
         print()
@@ -137,4 +143,3 @@ class SCProblem:
             info = {}
 
         return converged, info
-

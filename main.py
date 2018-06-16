@@ -7,16 +7,16 @@ from discretization import Discretize
 from visualization.plot3d import plot3d
 from scproblem import SCProblem
 
-m = Model_6DoF()
-
 
 def format_line(name, value, unit=""):
     name += ":"
-    if isinstance(value, (int, str)):
-        return f"{name.ljust(42)}{value}{unit}"
-    else:
-        return f"{name.ljust(42)}{value:{0}.{2}}{unit}"
+    if isinstance(value, (float, np.ndarray)):
+        value = f"{value:{0}.{2}}"
 
+    return f"{name.ljust(42)}{value}{unit}"
+
+
+m = Model_6DoF()
 
 # state and input
 X = np.empty(shape=[m.n_x, K])
@@ -46,7 +46,7 @@ for it in range(iterations):
     w_delta *= 1.2
 
     # pass parameters to model
-    prob.update_values(A_bar, B_bar, C_bar, Sigma_bar, z_bar, X, U, sigma, w_delta, w_nu, w_delta_sigma)
+    prob.update_values(A_bar, B_bar, C_bar, Sigma_bar, z_bar, X, U, sigma, w_delta, w_nu, w_delta_sigma, m.E)
 
     # solve problem
     info = prob.solve(verbose=False, solver='ECOS')
