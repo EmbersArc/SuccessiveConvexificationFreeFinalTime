@@ -67,16 +67,16 @@ class SCProblem:
             cvx.norm(self.nu_v, 1) <= self.nu_norm_v
         ]
 
-        model_objective = m.get_objective(self.X_v, self.U_v, self.X_last_p, self.U_last_p)
-
         # Objective:
-        objective = cvx.Minimize(
+        model_objective = m.get_objective(self.X_v, self.U_v, self.X_last_p, self.U_last_p)
+        sc_objective = cvx.Minimize(
             self.sigma_v
             + self.w_nu_p * self.nu_norm_v
             + self.w_delta_p * self.delta_norm_v
             + self.w_delta_sigma_p * self.delta_s_v
-            + model_objective
         )
+
+        objective = sc_objective + model_objective
 
         # Flight time positive:
         constraints += [self.sigma_v >= 0]
@@ -100,16 +100,21 @@ class SCProblem:
         self.w_delta_sigma_p.value = w_delta_sigma
 
     def solve(self, **kwargs):
+        error = False
         try:
             self.prob.solve(**kwargs)
         except cvx.SolverError:
+            error = True
             pass
 
         stats = self.prob.solver_stats
+        print()
 
         info = {
             "setup_time": stats.setup_time,
-            "solver_time": stats.solve_time
+            "solver_time": stats.solve_time,
+            "iterations": stats.num_iters,
+            "solver_error": error
         }
 
         return info

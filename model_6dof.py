@@ -43,7 +43,7 @@ class Model_6DoF:
     t_f_guess = 7.  # 10 s
 
     # State constraints
-    r_I_init = np.array((4., 2., 1.))  # 2000 m, 200 m, 200 m
+    r_I_init = np.array((3., 2., 1.))  # 2000 m, 200 m, 200 m
     v_I_init = np.array([-1., -1, -1])  # -300 m/s, 50 m/s, 50 m/s
     q_B_I_init = np.array((1.0, 0.0, 0.0, 0.0))
     w_B_init = np.array((0., 0., 0.))
@@ -215,9 +215,9 @@ class Model_6DoF:
         :param U_: cvx variable for current inputs
         :param X_last_: cvx parameter for last states
         :param U_last_: cvx parameter for last inputs
-        :return: A cost function.
+        :return: A cvx objective function.
         """
-        objective = 0.1 * cvx.norm(X_[2:4, -1])
+        objective = cvx.Minimize(0.1 * cvx.norm(X_[2:4, -1]))
         return objective
 
     def get_constraints(self, X_, U_, X_last_, U_last_):

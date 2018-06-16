@@ -12,7 +12,10 @@ m = Model_6DoF()
 
 def format_line(name, value, unit=""):
     name += ":"
-    return f"{name.ljust(40)}{value:{0}.{2}}{unit}"
+    if isinstance(value, (int, str)):
+        return f"{name.ljust(42)}{value}{unit}"
+    else:
+        return f"{name.ljust(42)}{value:{0}.{2}}{unit}"
 
 
 # state and input
@@ -33,7 +36,7 @@ prob = SCProblem(m, K)
 for it in range(iterations):
     t0_it = time.time()
     print('-' * 50)
-    print('-'*18 + f' Iteration {str(it + 1).zfill(2)} ' + '-'*18)
+    print('-' * 18 + f' Iteration {str(it + 1).zfill(2)} ' + '-' * 18)
     print('-' * 50)
 
     t0_tm = time.time()
@@ -50,6 +53,8 @@ for it in range(iterations):
 
     print(format_line("Setup Time", info["setup_time"], "s"))
     print(format_line("Solver Time", info["solver_time"], "s"))
+    print(format_line("Solver Iterations", info["iterations"]))
+    print(format_line("Solver Error", info["solver_error"]))
 
     # update values
     X, U, sigma = prob.get_solution()
@@ -77,8 +82,6 @@ for it in range(iterations):
 
 all_X = np.stack(all_X)
 all_U = np.stack(all_U)
-
-print(all_X.shape)
 
 # save trajectory to file for visualization
 np.save('visualization/trajectory/X.npy', all_X)
