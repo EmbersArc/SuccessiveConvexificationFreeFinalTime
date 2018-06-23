@@ -1,5 +1,5 @@
 import numpy as np
-from os import listdir, mkdir
+import os
 
 
 def euler_to_quat(a):
@@ -41,12 +41,15 @@ def save_arrays(path, a_dict):
     """
     path = path.rstrip('/')
 
-    if len(listdir(path)) == 0:
+    if not os.path.isdir(path):
+        os.mkdir(path)
+
+    if len(os.listdir(path)) == 0:
         folder_number = '000'
     else:
-        folder_number = str(int(max(listdir(path))) + 1).zfill(3)
+        folder_number = str(int(max(os.listdir(path))) + 1).zfill(3)
 
-    mkdir(f'{path}/{folder_number}')
+    os.mkdir(f'{path}/{folder_number}')
 
     for key in a_dict:
         np.save(f'{path}/{folder_number}/{key}.npy', a_dict[key])

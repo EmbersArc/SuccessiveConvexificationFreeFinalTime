@@ -83,7 +83,7 @@ def plot3d(X_in, U_in):
 
 if __name__ == "__main__":
 
-    X_in = np.load("trajectory/X.npy")
-    U_in = np.load("trajectory/U.npy")
+    X_in = np.load("trajectory/all/X.npy")
+    U_in = np.load("trajectory/all/U.npy")
 
     plot3d(X_in, U_in)

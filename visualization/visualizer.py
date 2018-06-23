@@ -35,7 +35,7 @@ for i in range(X.shape[1]):
     ry = -np.arctan(u[2] / u[0])
     rx = np.arctan(u[1] / u[0])
     eng.rotation_euler = (rx, ry, 0)
-    fir.scale[2] = np.linalg.norm(u) / 900000
+    fir.scale[2] = np.linalg.norm(u) / 800000
 
     rck.keyframe_insert(data_path='location')
     rck.keyframe_insert(data_path='rotation_quaternion')

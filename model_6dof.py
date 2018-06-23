@@ -31,7 +31,7 @@ def omega(w):
 
 class Model_6DoF:
     """
-    A 6 degrees of freedom rocket landing problem.
+    A 6 degree of freedom rocket landing problem.
     """
     n_x = 14
     n_u = 3
@@ -170,7 +170,7 @@ class Model_6DoF:
 
     def get_equations(self):
         """
-        :return: Functions to calculate A, B and f
+        :return: Functions to calculate A, B and f given state x and input u
         """
         f = zeros(14, 1)
 
@@ -226,7 +226,7 @@ class Model_6DoF:
 
     def get_objective(self, X_v, U_v, X_last_p, U_last_p):
         """
-        Get model specific objective to be minimzed.
+        Get model specific objective to be minimized.
 
         :param X_v: cvx variable for current states
         :param U_v: cvx variable for current inputs
@@ -273,12 +273,13 @@ class Model_6DoF:
             # Control constraints:
             cvx.norm(U_v[1:3, :], axis=0) <= self.tan_delta_max * U_v[0, :],  # gimbal angle constraint
             cvx.norm(U_v, axis=0) <= self.T_max,  # upper thrust constraint
-            U_v[0, :] >= self.T_min  # lower thrust constraint
+            # U_v[0, :] >= self.T_min  # simple lower thrust constraint
         ]
 
-        # linearized minimum thrust
-        # constraints += [
-        # self.T_min <= U_last_[:, k] / cvx.norm(U_last_[:, k]) * U_[:, k] for k in range(K)
-        # ]
+        # linearized lower thrust constraint
+        rhs = [U_last_p[:, k] / cvx.norm(U_last_p[:, k]) * U_v[:, k] for k in range(X_v.shape[1])]
+        constraints += [
+            self.T_min <= cvx.vstack(rhs)
+        ]
 
         return constraints

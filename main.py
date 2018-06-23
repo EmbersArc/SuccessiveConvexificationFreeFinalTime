@@ -75,8 +75,6 @@ for it in range(iterations):
         print("Initialization has converged.")
     elif converged and w_sigma == 1:
         print('Converged after', it + 1, 'iterations.')
-        save_arrays('visualization/trajectory/final/', {'X': m.x_redim(X), 'U': m.u_redim(U), 'sigma': sigma})
-
         break
 
     w_delta *= 1.2
@@ -85,9 +83,8 @@ all_X = np.stack(all_X)
 all_U = np.stack(all_U)
 
 # save trajectory to file for visualization
-np.save('visualization/trajectory/X.npy', all_X)
-np.save('visualization/trajectory/U.npy', all_U)
-np.save('visualization/trajectory/sigma.npy', sigma)
+save_arrays('visualization/trajectory/final/', {'X': m.x_redim(X), 'U': m.u_redim(U), 'sigma': sigma})
+save_arrays('visualization/trajectory/all/', {'X': all_X, 'U': all_U, 'sigma': sigma})
 
 # plot trajectory
 plot3d(all_X, all_U)
