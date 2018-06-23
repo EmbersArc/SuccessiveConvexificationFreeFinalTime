@@ -6,15 +6,7 @@ from parameters import *
 from discretization import Discretize
 from visualization.plot3d import plot3d
 from scproblem import SCProblem
-
-
-def format_line(name, value, unit=""):
-    name += ":"
-    if isinstance(value, (float, np.ndarray)):
-        value = f"{value:{0}.{2}}"
-
-    return f"{name.ljust(42)}{value}{unit}"
-
+from utils import format_line, save_arrays
 
 m = Model_6DoF()
 
@@ -25,6 +17,7 @@ U = np.empty(shape=[m.n_u, K])
 # INITIALIZATION--------------------------------------------------------------------------------------------------------
 sigma = m.t_f_guess
 X, U = m.initialize_trajectory(X, U)
+w_sigma = 0
 
 # START SUCCESSIVE CONVEXIFICATION--------------------------------------------------------------------------------------
 all_X = [X]
@@ -41,44 +34,52 @@ for it in range(iterations):
 
     t0_tm = time.time()
     A_bar, B_bar, C_bar, Sigma_bar, z_bar = disc.calculate(X, U, sigma)
-    print(format_line("Time for transition matrices", time.time() - t0_tm, "s"))
-
-    w_delta *= 1.2
+    print(format_line('Time for transition matrices', time.time() - t0_tm, 's'))
 
     # pass parameters to model
-    prob.update_values(A_bar, B_bar, C_bar, Sigma_bar, z_bar, X, U, sigma, w_delta, w_nu, w_delta_sigma, m.E)
+    prob.update_parameters(A_bar=A_bar, B_bar=B_bar, C_bar=C_bar, Sigma_bar=Sigma_bar, z_bar=z_bar,
+                           X_last=X, U_last=U, Sigma_last=sigma,
+                           E=m.E,
+                           weight_sigma=w_sigma, weight_delta=w_delta,
+                           weight_delta_sigma=w_delta_sigma, weight_nu=w_nu)
 
     # solve problem
-    info = prob.solve(verbose=False, solver='ECOS')
+    info = prob.solve(verbose=False, solver=solver)
 
-    print(format_line("Setup Time", info["setup_time"], "s"))
-    print(format_line("Solver Time", info["solver_time"], "s"))
-    print(format_line("Solver Iterations", info["iterations"]))
-    print(format_line("Solver Error", info["solver_error"]))
+    print(format_line('Setup Time', info['setup_time'], 's'))
+    print(format_line('Solver Time', info['solver_time'], 's'))
+    print(format_line('Solver Iterations', info['iterations']))
+    print(format_line('Solver Error', info['solver_error']))
 
     # update values
     X, U, sigma = prob.get_solution()
 
-    # save solution for plotting
-    all_X.append(X)
-    all_U.append(U)
-
     # check if solution has converged
     converged, info = prob.check_convergence(delta_tol, nu_tol)
 
-    print("\n")
-    print(format_line("Trust Region Cost", info["delta_norm"]))
-    print(format_line("Virtual Control Cost", info["nu_norm"]))
-    print(format_line("Total Time", info["sigma"]))
+    print('\n')
+    print(format_line('Trust Region Cost', info['delta_norm']))
+    print(format_line('Virtual Control Cost', info['nu_norm']))
+    print(format_line('Total Time', info['sigma'], 's'))
 
-    print("\n")
-    print(format_line("Time for iteration", time.time() - t0_it, "s"))
+    all_X.append(X)
+    all_U.append(U)
 
-    print("\n")
+    print('\n')
+    print(format_line('Time for iteration', time.time() - t0_it, 's'))
+    print('\n')
 
-    if converged:
+    if converged and w_sigma == 0:
+        w_sigma = 1
+        w_delta_sigma = 1e-1
+        print("Initialization has converged.")
+    elif converged and w_sigma == 1:
         print('Converged after', it + 1, 'iterations.')
+        save_arrays('visualization/trajectory/final/', {'X': m.x_redim(X), 'U': m.u_redim(U), 'sigma': sigma})
+
         break
+
+    w_delta *= 1.2
 
 all_X = np.stack(all_X)
 all_U = np.stack(all_U)

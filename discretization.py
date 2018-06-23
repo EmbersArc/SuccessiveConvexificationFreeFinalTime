@@ -16,12 +16,18 @@ class Discretize:
         self.z_bar = np.zeros([m.n_x, K - 1])
 
         # vector indices for flat matrices
-        self.x_ind = slice(0, m.n_x)
-        self.A_bar_ind = slice(m.n_x, m.n_x * (1 + m.n_x))
-        self.B_bar_ind = slice(m.n_x * (1 + m.n_x), m.n_x * (1 + m.n_x + m.n_u))
-        self.C_bar_ind = slice(m.n_x * (1 + m.n_x + m.n_u), m.n_x * (1 + m.n_x + m.n_u + m.n_u))
-        self.Sigma_bar_ind = slice(m.n_x * (1 + m.n_x + m.n_u + m.n_u), m.n_x * (1 + m.n_x + m.n_u + m.n_u + 1))
-        self.z_bar_ind = slice(m.n_x * (1 + m.n_x + m.n_u + m.n_u + 1), m.n_x * (1 + m.n_x + m.n_u + m.n_u + 2))
+        x_end = m.n_x
+        A_bar_end = m.n_x * (1 + m.n_x)
+        B_bar_end = m.n_x * (1 + m.n_x + m.n_u)
+        C_bar_end = m.n_x * (1 + m.n_x + m.n_u + m.n_u)
+        Sigma_bar_end = m.n_x * (1 + m.n_x + m.n_u + m.n_u + 1)
+        z_bar_end = m.n_x * (1 + m.n_x + m.n_u + m.n_u + 2)
+        self.x_ind = slice(0, x_end)
+        self.A_bar_ind = slice(x_end, A_bar_end)
+        self.B_bar_ind = slice(A_bar_end, B_bar_end)
+        self.C_bar_ind = slice(B_bar_end, C_bar_end)
+        self.Sigma_bar_ind = slice(C_bar_end, Sigma_bar_end)
+        self.z_bar_ind = slice(Sigma_bar_end, z_bar_end)
 
         self.f, self.A, self.B = m.get_equations()
 

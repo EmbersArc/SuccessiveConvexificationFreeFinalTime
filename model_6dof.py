@@ -1,6 +1,7 @@
 from sympy import *
 import numpy as np
 import cvxpy as cvx
+from utils import euler_to_quat
 
 
 def skew(v):
@@ -30,7 +31,7 @@ def omega(w):
 
 class Model_6DoF:
     """
-    A 6 degree of freedom rocket landing problem.
+    A 6 degrees of freedom rocket landing problem.
     """
     n_x = 14
     n_u = 3
@@ -40,21 +41,21 @@ class Model_6DoF:
     m_dry = 22000.  # 22000 kg
 
     # Flight time guess
-    t_f_guess = 20.  # 10 s
+    t_f_guess = 10.  # 10 s
+
+    # Vector from thrust point to CoM
+    r_T_B = np.array([-20., 0., 0.])  # -20 m
 
     # State constraints
-    r_I_init = np.array((1000., 200., 100.))  # 2000 m, 200 m, 200 m
-    v_I_init = np.array([-100., -50., -50.])  # -300 m/s, 50 m/s, 50 m/s
+    r_I_init = np.array((500., 0, 200))  # 2000 m, 200 m, 200 m
+    v_I_init = np.array([-50., -50., 0.])  # -300 m/s, 50 m/s, 50 m/s
     q_B_I_init = np.array((1.0, 0.0, 0.0, 0.0))
     w_B_init = np.array((0., 0., 0.))
 
-    r_I_final = np.array((0., 0., 0.))
-    v_I_final = np.array((0., 0., 0.))
+    r_I_final = np.array((20., 0., 0.))
+    v_I_final = np.array((-1e-1, 0., 0.))
     q_B_I_final = np.array((1.0, 0.0, 0.0, 0.0))
     w_B_final = np.array((0., 0., 0.))
-
-    x_init = np.concatenate(((m_wet,), r_I_init, v_I_init, q_B_I_init, w_B_init))
-    x_final = np.concatenate(((m_dry,), r_I_final, v_I_final, q_B_I_final, w_B_final))
 
     w_B_max = np.deg2rad(60)
 
@@ -64,14 +65,11 @@ class Model_6DoF:
     tan_gamma_gs = np.tan(np.deg2rad(20))
 
     # Thrust limits
-    T_max = 845000.  # 845000 [kg*m/s^2]
-    T_min = 0.0
+    T_max = 800000.  # 800000 [kg*m/s^2]
+    T_min = T_max * 0.4
 
     # Angular moment of inertia
-    J_B = np.diag([100000., 4000000., 4000000.])  # 100000 [kg*m^2], 4000000 [kg*m^2], 4000000 [kg*m^2]
-
-    # Vector from thrust point to CoM
-    r_T_B = np.array([-20., 0., 0.])  # -20 m
+    J_B = 100000 * np.diag([1., 1., 1.])  # 100000 [kg*m^2], 4000000 [kg*m^2], 4000000 [kg*m^2]
 
     # Gravity
     g_I = np.array((-9.81, 0., 0.))  # -9.81 [m/s^2]
@@ -80,7 +78,18 @@ class Model_6DoF:
     alpha_m = 1 / (282 * 9.81)  # 1 / (282 * 9.81) [s/m]
 
     # Virtual control selection matrix
-    E = np.diag([1, 1, 1, 1, 0, 0, 0, 1, 1, 1, 1, 0, 0, 0])
+    E = np.diag([1, 0, 0, 0, 1, 1, 1, 0, 0, 0, 0, 1, 1, 1])
+
+    def set_random_initial_state(self):
+        self.r_I_init[0] = np.random.uniform(0.5, 1)
+        self.r_I_init[1:3] = np.random.uniform(-0.5, 0.5, size=2)
+
+        self.v_I_init[0] = np.random.uniform(-0.2, -0.1)
+        self.v_I_init[1:3] = -self.r_I_init[1:3] * np.random.uniform(-0.5, 1.5, size=2)
+
+        self.q_B_I_init = np.array(euler_to_quat((0,
+                                                  np.random.uniform(-30, 30),
+                                                  np.random.uniform(-30, 30))))
 
     # ------------------------------------------ Start normalization stuff
     def __init__(self):
@@ -90,7 +99,12 @@ class Model_6DoF:
         and (it seems) precision is lost in the dynamics.
         """
 
-        self.r_scale = self.r_I_init[0]
+        # self.set_random_initial_state()
+
+        self.x_init = np.concatenate(((self.m_wet,), self.r_I_init, self.v_I_init, self.q_B_I_init, self.w_B_init))
+        self.x_final = np.concatenate(((self.m_dry,), self.r_I_final, self.v_I_final, self.q_B_I_final, self.w_B_final))
+
+        self.r_scale = np.linalg.norm(self.r_I_init)
         self.m_scale = self.m_wet
 
         self.nondimensionalize()
@@ -142,9 +156,9 @@ class Model_6DoF:
     def x_redim(self, x):
         """ redimensionalize x, assumed to have the shape of a solution """
 
-        x[:, 0] *= self.m_scale
-        x[:, 1:4] *= self.r_scale
-        x[:, 4:7] *= self.r_scale
+        x[0, :] *= self.m_scale
+        x[1:4, :] *= self.r_scale
+        x[4:7, :] *= self.r_scale
 
         return x
 
@@ -179,9 +193,9 @@ class Model_6DoF:
         A = f.jacobian(x)
         B = f.jacobian(u)
 
-        f_func = lambdify((x, u), f, "numpy")
-        A_func = lambdify((x, u), A, "numpy")
-        B_func = lambdify((x, u), B, "numpy")
+        f_func = lambdify((x, u), f, 'numpy')
+        A_func = lambdify((x, u), A, 'numpy')
+        B_func = lambdify((x, u), B, 'numpy')
 
         return f_func, A_func, B_func
 
@@ -210,55 +224,56 @@ class Model_6DoF:
 
         return X, U
 
-    def get_objective(self, X_, U_, X_last_, U_last_):
+    def get_objective(self, X_v, U_v, X_last_p, U_last_p):
         """
         Get model specific objective to be minimzed.
 
-        :param X_: cvx variable for current states
-        :param U_: cvx variable for current inputs
-        :param X_last_: cvx parameter for last states
-        :param U_last_: cvx parameter for last inputs
+        :param X_v: cvx variable for current states
+        :param U_v: cvx variable for current inputs
+        :param X_last_p: cvx parameter for last states
+        :param U_last_p: cvx parameter for last inputs
         :return: A cvx objective function.
         """
-        objective = cvx.Minimize(0.1 * cvx.norm(X_[2:4, -1]))
+        objective = cvx.Minimize(1e-1 * cvx.norm(X_v[2:4, -1]))
         return objective
 
-    def get_constraints(self, X_, U_, X_last_, U_last_):
+    def get_constraints(self, X_v, U_v, X_last_p, U_last_p):
         """
         Get model specific constraints.
 
-        :param X_: cvx variable for current states
-        :param U_: cvx variable for current inputs
-        :param X_last_: cvx parameter for last states
-        :param U_last_: cvx parameter for last inputs
+        :param X_v: cvx variable for current states
+        :param U_v: cvx variable for current inputs
+        :param X_last_p: cvx parameter for last states
+        :param U_last_p: cvx parameter for last inputs
         :return: A list of cvx constraints
         """
         # Boundary conditions:
         constraints = [
-            X_[0, 0] == self.x_init[0],
-            X_[1:4, 0] == self.x_init[1:4],
-            X_[4:7, 0] == self.x_init[4:7],
-            X_[7:11, 0] == self.x_init[7:11],
-            X_[11:14, 0] == self.x_init[11:14],
+            X_v[0, 0] == self.x_init[0],
+            X_v[1:4, 0] == self.x_init[1:4],
+            X_v[4:7, 0] == self.x_init[4:7],
+            # X_v[7:11, 0] == self.x_init[7:11],
+            X_v[11:14, 0] == self.x_init[11:14],
 
             # X_[0, 0] == self.x_final[0], # final mass is free
-            X_[1, -1] == self.x_final[1],
-            # final y and z are free
-            X_[4:, -1] == self.x_final[4:],
-            U_[1:3, -1] == 0,
+            X_v[1, -1] == self.x_final[1],
+            X_v[2:4, -1] == self.x_final[2:4],  # final y and z are free
+
+            X_v[4:, -1] == self.x_final[4:],
+            U_v[1:3, -1] == 0,
         ]
 
         constraints += [
             # State constraints:
-            X_[0, :] >= self.m_dry,
-            cvx.norm(X_[2: 4, :], axis=0) <= X_[1, :] / self.tan_gamma_gs,
-            cvx.norm(X_[9:11, :], axis=0) <= np.sqrt((1 - self.cos_theta_max) / 2),
-            cvx.norm(X_[11: 14, :], axis=0) <= self.w_B_max,
+            X_v[0, :] >= self.m_dry,  # minimum mass
+            cvx.norm(X_v[2: 4, :], axis=0) <= X_v[1, :] / self.tan_gamma_gs,  # glideslope
+            cvx.norm(X_v[9:11, :], axis=0) <= np.sqrt((1 - self.cos_theta_max) / 2),  # maximum angle
+            cvx.norm(X_v[11: 14, :], axis=0) <= self.w_B_max,  # maximum angular velocity
 
             # Control constraints:
-            cvx.norm(U_[1:3, :], axis=0) <= self.tan_delta_max * U_[0, :],
-            cvx.norm(U_, axis=0) <= self.T_max,
-            U_[0, :] >= 0
+            cvx.norm(U_v[1:3, :], axis=0) <= self.tan_delta_max * U_v[0, :],  # gimbal angle constraint
+            cvx.norm(U_v, axis=0) <= self.T_max,  # upper thrust constraint
+            U_v[0, :] >= self.T_min  # lower thrust constraint
         ]
 
         # linearized minimum thrust

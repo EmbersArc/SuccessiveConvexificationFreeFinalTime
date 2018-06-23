@@ -19,49 +19,52 @@ class SCProblem:
         self.delta_norm_v = cvx.Variable()
         self.delta_s_v = cvx.Variable()
 
-        # Slack Variables
+        # Objective Variables
         self.nu_v = cvx.Variable((m.n_x, K - 1))
         self.delta_v = cvx.Variable(K)
 
         # Parameters:
-        self.A_bar_p = cvx.Parameter((m.n_x * m.n_x, K - 1))
-        self.B_bar_p = cvx.Parameter((m.n_x * m.n_u, K - 1))
-        self.C_bar_p = cvx.Parameter((m.n_x * m.n_u, K - 1))
-        self.Sigma_bar_p = cvx.Parameter((m.n_x, K - 1))
-        self.z_bar_p = cvx.Parameter((m.n_x, K - 1))
+        self.par = dict()
+        self.par['A_bar'] = cvx.Parameter((m.n_x * m.n_x, K - 1))
+        self.par['B_bar'] = cvx.Parameter((m.n_x * m.n_u, K - 1))
+        self.par['C_bar'] = cvx.Parameter((m.n_x * m.n_u, K - 1))
+        self.par['Sigma_bar'] = cvx.Parameter((m.n_x, K - 1))
+        self.par['z_bar'] = cvx.Parameter((m.n_x, K - 1))
 
-        self.X_last_p = cvx.Parameter((m.n_x, K))
-        self.U_last_p = cvx.Parameter((m.n_u, K))
-        self.sigma_last_p = cvx.Parameter(nonneg=True)
+        self.par['X_last'] = cvx.Parameter((m.n_x, K))
+        self.par['U_last'] = cvx.Parameter((m.n_u, K))
+        self.par['Sigma_last'] = cvx.Parameter(nonneg=True)
 
-        self.w_delta_p = cvx.Parameter(nonneg=True)
-        self.w_nu_p = cvx.Parameter(nonneg=True)
-        self.w_delta_sigma_p = cvx.Parameter(nonneg=True)
+        self.par['E'] = cvx.Parameter((m.n_x, m.n_x), nonneg=True)
 
-        self.E_p = cvx.Parameter((m.n_x, m.n_x), nonneg=True)
+        self.par['weight_sigma'] = cvx.Parameter(nonneg=True)
+        self.par['weight_delta'] = cvx.Parameter(nonneg=True)
+        self.par['weight_nu'] = cvx.Parameter(nonneg=True)
+        self.par['weight_delta_sigma'] = cvx.Parameter(nonneg=True)
 
+        # Constraints:
         constraints = []
 
-        # Model constraints:
-        constraints += m.get_constraints(self.X_v, self.U_v, self.X_last_p, self.U_last_p)
+        # Model:
+        constraints += m.get_constraints(self.X_v, self.U_v, self.par['X_last'], self.par['U_last'])
 
         # Dynamics:
         rhs = [
-            cvx.reshape(self.A_bar_p[:, k], (m.n_x, m.n_x)) * self.X_v[:, k]
-            + cvx.reshape(self.B_bar_p[:, k], (m.n_x, m.n_u)) * self.U_v[:, k]
-            + cvx.reshape(self.C_bar_p[:, k], (m.n_x, m.n_u)) * self.U_v[:, k + 1]
-            + self.Sigma_bar_p[:, k] * self.sigma_v
-            + self.z_bar_p[:, k]
-            + self.E_p * self.nu_v[:, k]
+            cvx.reshape(self.par['A_bar'][:, k], (m.n_x, m.n_x)) * self.X_v[:, k]
+            + cvx.reshape(self.par['B_bar'][:, k], (m.n_x, m.n_u)) * self.U_v[:, k]
+            + cvx.reshape(self.par['C_bar'][:, k], (m.n_x, m.n_u)) * self.U_v[:, k + 1]
+            + self.par['Sigma_bar'][:, k] * self.sigma_v
+            + self.par['z_bar'][:, k]
+            + self.par['E'] * self.nu_v[:, k]
             for k in range(K - 1)
         ]
         rhs = cvx.vstack(rhs)
         constraints += [self.X_v[:, 1:].T == rhs]
 
         # Trust regions:
-        dx = self.X_v - self.X_last_p
-        du = self.U_v - self.U_last_p
-        ds = self.sigma_v - self.sigma_last_p
+        dx = self.X_v - self.par['X_last']
+        du = self.U_v - self.par['U_last']
+        ds = self.sigma_v - self.par['Sigma_last']
         constraints += [cvx.sum(cvx.square(dx), axis=0) + cvx.sum(cvx.square(du), axis=0) <= self.delta_v]
         constraints += [cvx.square(ds) <= self.delta_s_v]
 
@@ -72,39 +75,45 @@ class SCProblem:
         ]
 
         # Objective:
-        model_objective = m.get_objective(self.X_v, self.U_v, self.X_last_p, self.U_last_p)
+        model_objective = m.get_objective(self.X_v, self.U_v, self.par['X_last'], self.par['U_last'])
         sc_objective = cvx.Minimize(
-            self.sigma_v
-            + self.w_nu_p * self.nu_norm_v
-            + self.w_delta_p * self.delta_norm_v
-            + self.w_delta_sigma_p * self.delta_s_v
+            self.par['weight_sigma'] * self.sigma_v
+            + self.par['weight_nu'] * self.nu_norm_v
+            + self.par['weight_delta'] * self.delta_norm_v
+            + self.par['weight_delta_sigma'] * self.delta_s_v
         )
-        objective = sc_objective + model_objective
+        objective = sc_objective  # + model_objective
 
         # Flight time positive:
-        constraints += [self.sigma_v >= 0]
+        constraints += [self.sigma_v >= 0.1]
 
         self.prob = cvx.Problem(objective, constraints)
 
     def check_dcp(self):
         print('Problem is ' + ('valid.' if self.prob.is_dcp() else 'invalid.'))
 
-    def update_values(self, A_bar, B_bar, C_bar, Sigma_bar, z_bar, X, U, sigma, w_delta, w_nu, w_delta_sigma, E):
-        self.A_bar_p.value = A_bar
-        self.B_bar_p.value = B_bar
-        self.C_bar_p.value = C_bar
-        self.Sigma_bar_p.value = Sigma_bar
-        self.z_bar_p.value = z_bar
+    def update_parameters(self, **kwargs):
+        """
+        All parameters have to be filled before calling solve().
+        Takes the following arguments as keywords:
 
-        self.X_last_p.value = X
-        self.U_last_p.value = U
-        self.sigma_last_p.value = sigma
+        A_bar
+        B_bar
+        C_bar
+        Sigma_bar
+        z_bar
+        X_last
+        U_last
+        Sigma_last
+        E
+        weight_sigma
+        weight_delta
+        weight_delta_sigma
+        weight_nu
+        """
 
-        self.w_delta_p.value = w_delta
-        self.w_nu_p.value = w_nu
-        self.w_delta_sigma_p.value = w_delta_sigma
-
-        self.E_p.value = E
+        for key in kwargs:
+            self.par[key].value = kwargs[key]
 
     def solve(self, **kwargs):
         error = False
@@ -117,10 +126,10 @@ class SCProblem:
         print()
 
         info = {
-            "setup_time": stats.setup_time,
-            "solver_time": stats.solve_time,
-            "iterations": stats.num_iters,
-            "solver_error": error
+            'setup_time': stats.setup_time,
+            'solver_time': stats.solve_time,
+            'iterations': stats.num_iters,
+            'solver_error': error
         }
 
         return info
@@ -129,17 +138,16 @@ class SCProblem:
         return self.X_v.value, self.U_v.value, self.sigma_v.value
 
     def check_convergence(self, delta_tol, nu_tol):
-
         if self.delta_norm_v.value is not None:
             converged = self.delta_norm_v.value < delta_tol and self.nu_norm_v.value < nu_tol
             info = {
-                "delta_norm": self.delta_norm_v.value,
-                "nu_norm": self.nu_norm_v.value,
-                "sigma": self.sigma_v.value
+                'delta_norm': self.delta_norm_v.value,
+                'nu_norm': self.nu_norm_v.value,
+                'sigma': self.sigma_v.value
             }
         else:
             converged = False
-            print("No solution available. Call solve() first.")
+            print('No solution available. Call solve() first.')
             info = {}
 
         return converged, info

@@ -53,12 +53,15 @@ def my_plot(fig, figures_i):
         # ax.quiver(ry, rz, rx, vy, vz, vx, length=0.1, color='green')
 
         # attitude vector
-        ax.quiver(ry, rz, rx, dy, dz, dx, length=0.05, arrow_length_ratio=0.0, color='blue')
+        ax.quiver(ry, rz, rx, dy, dz, dx, length=0.1, arrow_length_ratio=0.0, color='blue')
 
         # thrust vector
-        ax.quiver(ry, rz, rx, -Fy, -Fz, -Fx, length=0.2, arrow_length_ratio=0.0, color='red')
+        ax.quiver(ry, rz, rx, -Fy, -Fz, -Fx, length=0.05, arrow_length_ratio=0.0, color='red')
 
-    ax.axis('equal')
+    ax.axis('scaled')
+    scale = np.max(X[0, 1:4, 0])
+    ax.axis(xmin=-scale, xmax=scale, ymin=-scale, ymax=scale)
+
     ax.set_title("iter " + str(figures_i))
     ax.plot(X_i[2, :], X_i[3, :], X_i[1, :], color='black')
 
@@ -79,7 +82,6 @@ def plot3d(X_in, U_in):
 
 
 if __name__ == "__main__":
-    import pickle
 
     X_in = np.load("trajectory/X.npy")
     U_in = np.load("trajectory/U.npy")
