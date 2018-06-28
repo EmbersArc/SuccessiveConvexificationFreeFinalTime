@@ -2,20 +2,22 @@
 K = 50
 
 # Max solver iterations
-iterations = 50
+iterations = 100
 
 # Weight constants
 # flight time
 w_sigma = 1
 # virtual control
-w_nu = 1e5  # 1e5
-# state and input trust region
-w_delta = 1e-3  # 1e-3
-# time trust region
-w_delta_sigma = 1e-1  # 1e-1
+w_nu = 1e3  # 1e5
+
+# initial trust region radius
+r_delta = 1
+# trust region variables
+rho_0 = 0.0
+rho_1 = 0.25
+rho_2 = 0.9
+alpha = 2.0
+beta = 3.2
 
 solver = ['ECOS', 'MOSEK'][0]
 
-# Exit conditions
-nu_tol = 1e-8
-delta_tol = 1e-2

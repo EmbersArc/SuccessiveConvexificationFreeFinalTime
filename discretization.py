@@ -2,7 +2,7 @@ import numpy as np
 from scipy.integrate import odeint
 
 
-class Discretize:
+class Integrator:
     def __init__(self, m, K):
         self.K = K
         self.m = m
@@ -37,7 +37,7 @@ class Discretize:
 
         self.dt = 1 / (K - 1)
 
-    def calculate(self, X, U, sigma):
+    def calculate_discretization(self, X, U, sigma):
         """
         Calculate discretization for given states, inputs and total time.
 
@@ -48,7 +48,7 @@ class Discretize:
         """
         for k in range(self.K - 1):
             self.V0[self.x_ind] = X[:, k]
-            V = np.array(odeint(self.ode_dVdt, self.V0, (0, self.dt), args=(U[:, k], U[:, k + 1], sigma))[1, :])
+            V = np.array(odeint(self._ode_dVdt, self.V0, (0, self.dt), args=(U[:, k], U[:, k + 1], sigma))[1, :])
 
             # using \Phi_A(\tau_{k+1},\xi) = \Phi_A(\tau_{k+1},\tau_k)\Phi_A(\xi,\tau_k)^{-1}
             # flatten matrices in column-major (Fortran) order for CVXPY
@@ -61,7 +61,7 @@ class Discretize:
 
         return self.A_bar, self.B_bar, self.C_bar, self.Sigma_bar, self.z_bar
 
-    def ode_dVdt(self, V, t, u_t, u_t1, sigma):
+    def _ode_dVdt(self, V, t, u_t, u_t1, sigma):
         """
         ODE function to compute dVdt.
 
@@ -95,3 +95,26 @@ class Discretize:
         dVdt[self.z_bar_ind] = np.matmul(Phi_A_xi, z_t)
 
         return dVdt
+
+    def integrate_nonlinear_piecewise(self, X_l, U, sigma):
+        X_nl = np.empty_like(X_l)
+        X_nl[:, 0] = X_l[:, 0]
+
+        for k in range(self.K - 1):
+            X_nl[:, k + 1] = odeint(self._dx, X_l[:, k], (0, self.dt * sigma), args=(U[:, k], U[:, k + 1], sigma))[1, :]
+
+        return X_nl
+
+    def integrate_nonlinear_full(self, x0, U, sigma):
+        X_nl = np.empty([x0.size, U.shape[1]])
+        X_nl[:, 0] = x0
+
+        for k in range(self.K - 1):
+            X_nl[:, k + 1] = odeint(self._dx, X_nl[:, k], (0, self.dt * sigma), args=(U[:, k], U[:, k + 1], sigma))[1, :]
+
+        return X_nl
+
+    def _dx(self, x, t, u_t, u_t1, sigma):
+        u = u_t + (t / (self.dt * sigma)) * (u_t1 - u_t)
+
+        return np.squeeze(self.f(x, u))
