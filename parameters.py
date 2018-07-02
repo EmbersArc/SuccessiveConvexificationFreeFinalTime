@@ -6,9 +6,9 @@ iterations = 100
 
 # Weight constants
 # flight time
-w_sigma = 1
+w_sigma = 1.0
 # virtual control
-w_nu = 1e3  # 1e5
+w_nu = 1e3
 
 # initial trust region radius
 r_delta = 1
@@ -19,5 +19,5 @@ rho_2 = 0.9
 alpha = 2.0
 beta = 3.2
 
-solver = ['ECOS', 'MOSEK'][0]
+solver = ['ECOS', 'MOSEK'][1]
 

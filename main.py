@@ -35,13 +35,13 @@ for it in range(iterations):
     print('-' * 50)
 
     t0_tm = time()
-    A_bar, B_bar, C_bar, Sigma_bar, z_bar = integrator.calculate_discretization(X, U, sigma)
+    A_bar, B_bar, C_bar, S_bar, z_bar = integrator.calculate_discretization(X, U, sigma)
     print(format_line('Time for transition matrices', time() - t0_tm, 's'))
 
-    problem.set_parameters(A_bar=A_bar, B_bar=B_bar, C_bar=C_bar, Sigma_bar=Sigma_bar, z_bar=z_bar,
+    problem.set_parameters(A_bar=A_bar, B_bar=B_bar, C_bar=C_bar, S_bar=S_bar, z_bar=z_bar,
                            X_last=X, U_last=U, sigma_last=sigma,
                            E=m.E,
-                           radius_delta=r_delta,
+                           radius_trust_region=r_delta,
                            weight_sigma=w_sigma, weight_nu=w_nu)
 
     while True:
@@ -59,30 +59,32 @@ for it in range(iterations):
         sigma = problem.get_variable('sigma')
 
         # check if solution has converged
-        nu_norm = np.linalg.norm(problem.get_variable('nu'), 1)
+        linear_cost = np.linalg.norm(problem.get_variable('nu'), 1)
         nonlinear_cost = np.linalg.norm(X - integrator.integrate_nonlinear_piecewise(X, U, sigma), ord=1)
 
         if last_linear_cost is None:
-            last_linear_cost = nu_norm
+            last_linear_cost = linear_cost
+            sigma_last = sigma
             break
 
-        actual_change = last_linear_cost - nu_norm
+        actual_change = last_linear_cost - linear_cost
         predicted_change = last_linear_cost - nonlinear_cost
 
-        print('\n')
-        print(format_line('Virtual Control Cost', nu_norm))
+        print('')
+        print(format_line('Virtual Control Cost', linear_cost))
         print(format_line('Total Time', sigma, 's'))
+        print('')
+        print(format_line('Actual change', actual_change))
+        print(format_line('Predicted change', predicted_change))
 
-        if abs(predicted_change) < 0.001:
+        if abs(predicted_change) < 0.000001:
             converged = True
             break
         else:
-            print(f'Actual change:    {actual_change}\n'
-                  f'Predicted change: {predicted_change}')
             rho = actual_change / predicted_change
             if rho < rho_0:
                 r_delta /= alpha
-                print(f'Rho={rho} too small. Solving again with radius={r_delta}')
+                print(f'rho={rho} too small. Solving again with radius={r_delta}')
             else:
                 if rho < rho_1:
                     print('Decreasing radius.')
@@ -91,17 +93,16 @@ for it in range(iterations):
                     print('Increasing radius.')
                     r_delta *= beta
 
-                last_linear_cost = nu_norm
-
+                last_linear_cost = linear_cost
                 break
 
-        problem.set_parameters(radius_delta=r_delta)
+        problem.set_parameters(radius_trust_region=r_delta)
 
         print('-' * 50)
 
-    print('\n')
+    print('')
     print(format_line('Time for iteration', time() - t0_it, 's'))
-    print('\n')
+    print('')
 
     all_X.append(X)
     all_U.append(U)

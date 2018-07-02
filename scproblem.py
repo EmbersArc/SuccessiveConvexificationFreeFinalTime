@@ -23,7 +23,7 @@ class SCProblem:
         self.par['A_bar'] = cvx.Parameter((m.n_x * m.n_x, K - 1))
         self.par['B_bar'] = cvx.Parameter((m.n_x * m.n_u, K - 1))
         self.par['C_bar'] = cvx.Parameter((m.n_x * m.n_u, K - 1))
-        self.par['Sigma_bar'] = cvx.Parameter((m.n_x, K - 1))
+        self.par['S_bar'] = cvx.Parameter((m.n_x, K - 1))
         self.par['z_bar'] = cvx.Parameter((m.n_x, K - 1))
 
         self.par['X_last'] = cvx.Parameter((m.n_x, K))
@@ -34,7 +34,7 @@ class SCProblem:
 
         self.par['weight_sigma'] = cvx.Parameter(nonneg=True)
         self.par['weight_nu'] = cvx.Parameter(nonneg=True)
-        self.par['radius_delta'] = cvx.Parameter(nonneg=True)
+        self.par['radius_trust_region'] = cvx.Parameter(nonneg=True)
 
         # Constraints:
         constraints = []
@@ -47,7 +47,7 @@ class SCProblem:
             cvx.reshape(self.par['A_bar'][:, k], (m.n_x, m.n_x)) * self.var['X'][:, k]
             + cvx.reshape(self.par['B_bar'][:, k], (m.n_x, m.n_u)) * self.var['U'][:, k]
             + cvx.reshape(self.par['C_bar'][:, k], (m.n_x, m.n_u)) * self.var['U'][:, k + 1]
-            + self.par['Sigma_bar'][:, k] * self.var['sigma']
+            + self.par['S_bar'][:, k] * self.var['sigma']
             + self.par['z_bar'][:, k]
             + self.par['E'] * self.var['nu'][:, k]
             for k in range(K - 1)
@@ -56,16 +56,17 @@ class SCProblem:
         constraints += [self.var['X'][:, 1:].T == rhs]
 
         # Trust regions:
-        # dx = self.X_v - self.par['X_last']
+        dx = self.var['X'] - self.par['X_last']
         du = self.var['U'] - self.par['U_last']
         ds = self.var['sigma'] - self.par['sigma_last']
-        constraints += [cvx.norm(du, 1, axis=0) + cvx.norm(ds, 1) <= self.par['radius_delta']]
+        constraints += [cvx.norm(dx, 1) <= self.par['radius_trust_region']]
+        constraints += [cvx.norm(du, 1) <= self.par['radius_trust_region']]
+        constraints += [cvx.norm(ds, 1) <= self.par['radius_trust_region']]
 
         # Objective:
         model_objective = m.get_objective(self.var['X'], self.var['U'], self.par['X_last'], self.par['U_last'])
         sc_objective = cvx.Minimize(
-            self.par['weight_sigma'] * self.var['sigma']
-            + self.par['weight_nu'] * cvx.norm(self.var['nu'], 1)
+            self.par['weight_sigma'] * self.var['sigma'] + self.par['weight_nu'] * cvx.norm(self.var['nu'], 1)
         )
         objective = sc_objective
         if model_objective is not None:
@@ -84,7 +85,7 @@ class SCProblem:
         A_bar
         B_bar
         C_bar
-        Sigma_bar
+        S_bar
         z_bar
         X_last
         U_last
@@ -92,7 +93,7 @@ class SCProblem:
         E
         weight_sigma
         weight_nu
-        radius_delta
+        radius_trust_region
         """
 
         for key in kwargs:
@@ -149,4 +150,3 @@ class SCProblem:
         }
 
         return info
-

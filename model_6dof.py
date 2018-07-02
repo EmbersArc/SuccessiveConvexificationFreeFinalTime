@@ -41,7 +41,7 @@ class Model_6DoF:
     m_dry = 1.  # 22000 kg
 
     # Flight time guess
-    t_f_guess = 5.  # 10 s
+    t_f_guess = 10.  # 10 s
 
     # Vector from thrust point to CoM
     r_T_B = np.array([-1e-2, 0., 0.])  # -20 m
@@ -75,7 +75,7 @@ class Model_6DoF:
     g_I = np.array((-1, 0., 0.))  # -9.81 [m/s^2]
 
     # Fuel consumption
-    alpha_m = 0.005  # 1 / (282 * 9.81) [s/m]
+    alpha_m = 0.01  # 1 / (282 * 9.81) [s/m]
 
     # Algorithm-related:
     # Virtual control selection matrix
@@ -253,12 +253,11 @@ class Model_6DoF:
             X_v[0, 0] == self.x_init[0],
             X_v[1:4, 0] == self.x_init[1:4],
             X_v[4:7, 0] == self.x_init[4:7],
-            X_v[7:11, 0] == self.x_init[7:11],
+            # X_v[7:11, 0] == self.x_init[7:11],
             X_v[11:14, 0] == self.x_init[11:14],
 
             # X_[0, -1] == self.x_final[0], # final mass is free
-            X_v[1:4, -1] == self.x_final[1:4],
-            X_v[4:, -1] == self.x_final[4:],
+            X_v[1:, -1] == self.x_final[1:],
             U_v[1:3, -1] == 0,
         ]
 
