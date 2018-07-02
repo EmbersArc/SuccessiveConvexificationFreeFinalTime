@@ -1,11 +1,11 @@
-from sympy import *
+import sympy as sp
 import numpy as np
 import cvxpy as cvx
 from utils import euler_to_quat
 
 
 def skew(v):
-    return Matrix([
+    return sp.Matrix([
         [0, -v[2], v[1]],
         [v[2], 0, -v[0]],
         [-v[1], v[0], 0]
@@ -13,7 +13,7 @@ def skew(v):
 
 
 def dir_cosine(q):
-    return Matrix([
+    return sp.Matrix([
         [1 - 2 * (q[2] ** 2 + q[3] ** 2), 2 * (q[1] * q[2] + q[0] * q[3]), 2 * (q[1] * q[3] - q[0] * q[2])],
         [2 * (q[1] * q[2] - q[0] * q[3]), 1 - 2 * (q[1] ** 2 + q[3] ** 2), 2 * (q[2] * q[3] + q[0] * q[1])],
         [2 * (q[1] * q[3] + q[0] * q[2]), 2 * (q[2] * q[3] - q[0] * q[1]), 1 - 2 * (q[1] ** 2 + q[2] ** 2)]
@@ -21,7 +21,7 @@ def dir_cosine(q):
 
 
 def omega(w):
-    return Matrix([
+    return sp.Matrix([
         [0, -w[0], -w[1], -w[2]],
         [w[0], 0, w[2], -w[1]],
         [w[1], -w[2], 0, w[0]],
@@ -75,7 +75,7 @@ class Model_6DoF:
     g_I = np.array((-1, 0., 0.))  # -9.81 [m/s^2]
 
     # Fuel consumption
-    alpha_m = 0.01  # 1 / (282 * 9.81) [s/m]
+    alpha_m = 0.002  # 1 / (282 * 9.81) [s/m]
 
     # Algorithm-related:
     # Virtual control selection matrix
@@ -89,8 +89,8 @@ class Model_6DoF:
         self.v_I_init[1:3] = np.random.uniform(-1, 1, size=2)
 
         self.q_B_I_init = np.array(euler_to_quat((0,
-                                                  -np.random.uniform(0, 70) * self.r_I_init[1],
-                                                  -np.random.uniform(0, 70) * self.r_I_init[2])))
+                                                  -np.random.uniform(0, 20) * self.r_I_init[1],
+                                                  -np.random.uniform(0, 20) * self.r_I_init[2])))
 
     # ------------------------------------------ Start normalization stuff
     def __init__(self):
@@ -173,14 +173,14 @@ class Model_6DoF:
         """
         :return: Functions to calculate A, B and f given state x and input u
         """
-        f = zeros(14, 1)
+        f = sp.zeros(14, 1)
 
-        x = Matrix(symbols('m rx ry rz vx vy vz q0 q1 q2 q3 wx wy wz', real=True))
-        u = Matrix(symbols('ux uy uz', real=True))
+        x = sp.Matrix(sp.symbols('m rx ry rz vx vy vz q0 q1 q2 q3 wx wy wz', real=True))
+        u = sp.Matrix(sp.symbols('ux uy uz', real=True))
 
-        g_I = Matrix(self.g_I)
-        r_T_B = Matrix(self.r_T_B)
-        J_B = Matrix(self.J_B)
+        g_I = sp.Matrix(self.g_I)
+        r_T_B = sp.Matrix(self.r_T_B)
+        J_B = sp.Matrix(self.J_B)
 
         C_B_I = dir_cosine(x[7:11, 0])
         C_I_B = C_B_I.transpose()
@@ -194,9 +194,9 @@ class Model_6DoF:
         A = f.jacobian(x)
         B = f.jacobian(u)
 
-        f_func = lambdify((x, u), f, 'numpy')
-        A_func = lambdify((x, u), A, 'numpy')
-        B_func = lambdify((x, u), B, 'numpy')
+        f_func = sp.lambdify((x, u), f, 'numpy')
+        A_func = sp.lambdify((x, u), A, 'numpy')
+        B_func = sp.lambdify((x, u), B, 'numpy')
 
         return f_func, A_func, B_func
 
@@ -253,7 +253,7 @@ class Model_6DoF:
             X_v[0, 0] == self.x_init[0],
             X_v[1:4, 0] == self.x_init[1:4],
             X_v[4:7, 0] == self.x_init[4:7],
-            # X_v[7:11, 0] == self.x_init[7:11],
+            X_v[7:11, 0] == self.x_init[7:11],
             X_v[11:14, 0] == self.x_init[11:14],
 
             # X_[0, -1] == self.x_final[0], # final mass is free

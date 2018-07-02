@@ -41,30 +41,26 @@ for it in range(iterations):
     problem.set_parameters(A_bar=A_bar, B_bar=B_bar, C_bar=C_bar, S_bar=S_bar, z_bar=z_bar,
                            X_last=X, U_last=U, sigma_last=sigma,
                            E=m.E,
-                           radius_trust_region=r_delta,
+                           radius_trust_region=tr_radius,
                            weight_sigma=w_sigma, weight_nu=w_nu)
 
     while True:
-        # solve problem
         info = problem.solve(verbose=False, solver=solver)
-
-        # print(format_line('Setup Time', info['setup_time'], 's'))
-        # print(format_line('Solver Time', info['solver_time'], 's'))
-        # print(format_line('Solver Iterations', info['iterations']))
         print(format_line('Solver Error', info['solver_error']))
 
-        # update values
-        X = problem.get_variable('X')
-        U = problem.get_variable('U')
-        sigma = problem.get_variable('sigma')
+        # get solution
+        new_X = problem.get_variable('X')
+        new_U = problem.get_variable('U')
+        new_sigma = problem.get_variable('sigma')
 
-        # check if solution has converged
         linear_cost = np.linalg.norm(problem.get_variable('nu'), 1)
-        nonlinear_cost = np.linalg.norm(X - integrator.integrate_nonlinear_piecewise(X, U, sigma), ord=1)
+        nonlinear_cost = np.linalg.norm(new_X - integrator.integrate_nonlinear_piecewise(new_X, new_U, new_sigma), 1)
 
         if last_linear_cost is None:
             last_linear_cost = linear_cost
-            sigma_last = sigma
+            X = new_X
+            U = new_U
+            sigma = new_sigma
             break
 
         actual_change = last_linear_cost - linear_cost
@@ -76,27 +72,34 @@ for it in range(iterations):
         print('')
         print(format_line('Actual change', actual_change))
         print(format_line('Predicted change', predicted_change))
+        print('')
 
-        if abs(predicted_change) < 0.000001:
+        if abs(predicted_change) < 1e-10:
             converged = True
             break
         else:
             rho = actual_change / predicted_change
             if rho < rho_0:
-                r_delta /= alpha
-                print(f'rho={rho} too small. Solving again with radius={r_delta}')
+                # discard
+                tr_radius /= alpha
+                print(f'Trust region too large. Solving again with radius={tr_radius}')
             else:
+                # accept
+                X = new_X
+                U = new_U
+                sigma = new_sigma
+
                 if rho < rho_1:
                     print('Decreasing radius.')
-                    r_delta /= alpha
+                    tr_radius /= alpha
                 elif rho >= rho_2:
                     print('Increasing radius.')
-                    r_delta *= beta
+                    tr_radius *= beta
 
                 last_linear_cost = linear_cost
                 break
 
-        problem.set_parameters(radius_trust_region=r_delta)
+        problem.set_parameters(radius_trust_region=tr_radius)
 
         print('-' * 50)
 

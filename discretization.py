@@ -97,7 +97,7 @@ class Integrator:
         return dVdt
 
     def integrate_nonlinear_piecewise(self, X_l, U, sigma):
-        X_nl = np.empty_like(X_l)
+        X_nl = np.zeros_like(X_l)
         X_nl[:, 0] = X_l[:, 0]
 
         for k in range(self.K - 1):

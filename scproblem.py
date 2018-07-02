@@ -15,7 +15,6 @@ class SCProblem:
         self.var['X'] = cvx.Variable((m.n_x, K))
         self.var['U'] = cvx.Variable((m.n_u, K))
         self.var['sigma'] = cvx.Variable()
-        # Objective Variables
         self.var['nu'] = cvx.Variable((m.n_x, K - 1))
 
         # Parameters:
@@ -43,7 +42,8 @@ class SCProblem:
         constraints += m.get_constraints(self.var['X'], self.var['U'], self.par['X_last'], self.par['U_last'])
 
         # Dynamics:
-        rhs = [
+        constraints += [
+            self.var['X'][:, k + 1] ==
             cvx.reshape(self.par['A_bar'][:, k], (m.n_x, m.n_x)) * self.var['X'][:, k]
             + cvx.reshape(self.par['B_bar'][:, k], (m.n_x, m.n_u)) * self.var['U'][:, k]
             + cvx.reshape(self.par['C_bar'][:, k], (m.n_x, m.n_u)) * self.var['U'][:, k + 1]
@@ -52,8 +52,6 @@ class SCProblem:
             + self.par['E'] * self.var['nu'][:, k]
             for k in range(K - 1)
         ]
-        rhs = cvx.vstack(rhs)
-        constraints += [self.var['X'][:, 1:].T == rhs]
 
         # Trust regions:
         dx = self.var['X'] - self.par['X_last']
@@ -73,7 +71,7 @@ class SCProblem:
             objective += model_objective
 
         # Flight time positive:
-        constraints += [self.var['sigma'] >= 1.0]
+        constraints += [self.var['sigma'] >= 0.1]
 
         self.prob = cvx.Problem(objective, constraints)
 
