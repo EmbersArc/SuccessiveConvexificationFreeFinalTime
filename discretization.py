@@ -61,22 +61,21 @@ class Integrator:
 
         return self.A_bar, self.B_bar, self.C_bar, self.S_bar, self.z_bar
 
-    def _ode_dVdt(self, V, t, u_t, u_t1, sigma):
+    def _ode_dVdt(self, V, t, u_t0, u_t1, sigma):
         """
         ODE function to compute dVdt.
 
         :param V: evaluation state V = [x, Phi_A, B_bar, C_bar, S_bar, z_bar]
         :param t: evaluation time
-        :param u_t: input at start of interval
+        :param u_t0: input at start of interval
         :param u_t1: input at end of interval
         :param sigma: total time
         :return: derivative at current time and state dVdt
         """
         alpha = t / self.dt
         beta = 1. - alpha
-        dVdt = np.empty((len(self.V0),))
         x = V[self.x_ind]
-        u = u_t + alpha * (u_t1 - u_t)
+        u = u_t0 + alpha * (u_t1 - u_t0)
 
         # using \Phi_A(\tau_{k+1},\xi) = \Phi_A(\tau_{k+1},\tau_k)\Phi_A(\xi,\tau_k)^{-1}
         # and pre-multiplying with \Phi_A(\tau_{k+1},\tau_k) after integration
@@ -86,6 +85,7 @@ class Integrator:
         B_subs = sigma * self.B(x, u)
         f_subs = self.f(x, u)
 
+        dVdt = np.zeros_like(V)
         dVdt[self.x_ind] = sigma * f_subs.transpose()
         dVdt[self.A_bar_ind] = np.matmul(A_subs, V[self.A_bar_ind].reshape((self.n_x, self.n_x))).reshape(-1)
         dVdt[self.B_bar_ind] = np.matmul(Phi_A_xi, B_subs).reshape(-1) * alpha
@@ -106,16 +106,15 @@ class Integrator:
         return X_nl
 
     def integrate_nonlinear_full(self, x0, U, sigma):
-        X_nl = np.empty([x0.size, U.shape[1]])
+        X_nl = np.zeros([x0.size, self.K])
         X_nl[:, 0] = x0
 
         for k in range(self.K - 1):
-            X_nl[:, k + 1] = odeint(self._dx, X_nl[:, k], (0, self.dt * sigma), args=(U[:, k], U[:, k + 1], sigma))[1,
-                             :]
+            X_nl[:, k + 1] = odeint(self._dx, X_nl[:, k], (0, self.dt * sigma), args=(U[:, k], U[:, k + 1], sigma))[1, :]
 
         return X_nl
 
-    def _dx(self, x, t, u_t, u_t1, sigma):
-        u = u_t + (t / (self.dt * sigma)) * (u_t1 - u_t)
+    def _dx(self, x, t, u_t0, u_t1, sigma):
+        u = u_t0 + (t / (self.dt * sigma)) * (u_t1 - u_t0)
 
         return np.squeeze(self.f(x, u))

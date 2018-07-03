@@ -1,14 +1,14 @@
 # Trajectory points
-K = 50
+K = 30
 
 # Max solver iterations
-iterations = 100
+iterations = 20
 
 # Weight constants
 # flight time
 w_sigma = 1
 # virtual control
-w_nu = 1e4
+w_nu = 1e5
 
 # initial trust region radius
 tr_radius = 1
@@ -16,7 +16,7 @@ tr_radius = 1
 rho_0 = 0.0
 rho_1 = 0.25
 rho_2 = 0.9
-alpha = 1.4
-beta = 1.8
+alpha = 2.0
+beta = 3.2
 
 solver = ['ECOS', 'MOSEK'][0]

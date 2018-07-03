@@ -40,7 +40,6 @@ for it in range(iterations):
 
     problem.set_parameters(A_bar=A_bar, B_bar=B_bar, C_bar=C_bar, S_bar=S_bar, z_bar=z_bar,
                            X_last=X, U_last=U, sigma_last=sigma,
-                           E=m.E,
                            radius_trust_region=tr_radius,
                            weight_sigma=w_sigma, weight_nu=w_nu)
 
@@ -80,7 +79,7 @@ for it in range(iterations):
         else:
             rho = actual_change / predicted_change
             if rho < rho_0:
-                # discard
+                # reject
                 tr_radius /= alpha
                 print(f'Trust region too large. Solving again with radius={tr_radius}')
             else:
@@ -111,7 +110,7 @@ for it in range(iterations):
     all_U.append(U)
 
     if converged:
-        print('Converged after', it + 1, 'iterations.')
+        print(f'Converged after {it + 1} iterations.')
         break
 
 all_X = np.stack(all_X)

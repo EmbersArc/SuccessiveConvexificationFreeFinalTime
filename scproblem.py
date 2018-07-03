@@ -29,8 +29,6 @@ class SCProblem:
         self.par['U_last'] = cvx.Parameter((m.n_u, K))
         self.par['sigma_last'] = cvx.Parameter(nonneg=True)
 
-        self.par['E'] = cvx.Parameter((m.n_x, m.n_x), nonneg=True)
-
         self.par['weight_sigma'] = cvx.Parameter(nonneg=True)
         self.par['weight_nu'] = cvx.Parameter(nonneg=True)
         self.par['radius_trust_region'] = cvx.Parameter(nonneg=True)
@@ -49,7 +47,7 @@ class SCProblem:
             + cvx.reshape(self.par['C_bar'][:, k], (m.n_x, m.n_u)) * self.var['U'][:, k + 1]
             + self.par['S_bar'][:, k] * self.var['sigma']
             + self.par['z_bar'][:, k]
-            + self.par['E'] * self.var['nu'][:, k]
+            + self.var['nu'][:, k]
             for k in range(K - 1)
         ]
 
@@ -61,6 +59,9 @@ class SCProblem:
         constraints += [cvx.norm(du, 1) <= self.par['radius_trust_region']]
         constraints += [cvx.norm(ds, 1) <= self.par['radius_trust_region']]
 
+        # Flight time positive:
+        constraints += [self.var['sigma'] >= 0.1]
+
         # Objective:
         model_objective = m.get_objective(self.var['X'], self.var['U'], self.par['X_last'], self.par['U_last'])
         sc_objective = cvx.Minimize(
@@ -69,9 +70,6 @@ class SCProblem:
         objective = sc_objective
         if model_objective is not None:
             objective += model_objective
-
-        # Flight time positive:
-        constraints += [self.var['sigma'] >= 0.1]
 
         self.prob = cvx.Problem(objective, constraints)
 
