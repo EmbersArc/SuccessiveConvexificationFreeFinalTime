@@ -65,12 +65,12 @@ class Integrator:
         """
         ODE function to compute dVdt.
 
-        :param V: evaluation state V = [x, Phi_A, B_bar, C_bar, S_bar, z_bar]
-        :param t: evaluation time
-        :param u_t0: input at start of interval
-        :param u_t1: input at end of interval
-        :param sigma: total time
-        :return: derivative at current time and state dVdt
+        :param V: Evaluation state V = [x, Phi_A, B_bar, C_bar, S_bar, z_bar]
+        :param t: Evaluation time
+        :param u_t0: Input at start of interval
+        :param u_t1: Input at end of interval
+        :param sigma: Total time
+        :return: Derivative at current time and state dVdt
         """
         alpha = t / self.dt
         beta = 1. - alpha
@@ -97,6 +97,13 @@ class Integrator:
         return dVdt
 
     def integrate_nonlinear_piecewise(self, X_l, U, sigma):
+        """
+        Piecewise integration to verfify accuracy of linearization.
+        :param X_l: Linear state evolution
+        :param U: Linear input evolution
+        :param sigma: Total time
+        :return: The piecewise integrated dynamics
+        """
         X_nl = np.zeros_like(X_l)
         X_nl[:, 0] = X_l[:, 0]
 
@@ -106,6 +113,13 @@ class Integrator:
         return X_nl
 
     def integrate_nonlinear_full(self, x0, U, sigma):
+        """
+        Simulate nonlinear behavior given an initial state and an input over time.
+        :param x0: Initial state
+        :param U: Linear input evolution
+        :param sigma: Total time
+        :return: The full integrated dynamics
+        """
         X_nl = np.zeros([x0.size, self.K])
         X_nl[:, 0] = x0
 
