@@ -53,10 +53,10 @@ def my_plot(fig, figures_i):
         # ax.quiver(ry, rz, rx, vy, vz, vx, length=0.1, color='green')
 
         # attitude vector
-        ax.quiver(ry, rz, rx, dy, dz, dx, length=0.1, arrow_length_ratio=0.0, color='blue')
+        ax.quiver(ry, rz, rx, dy, dz, dx, length=0.5, arrow_length_ratio=0.0, color='blue')
 
         # thrust vector
-        ax.quiver(ry, rz, rx, -Fy, -Fz, -Fx, length=0.05, arrow_length_ratio=0.0, color='red')
+        ax.quiver(ry, rz, rx, -Fy, -Fz, -Fx, length=0.1, arrow_length_ratio=0.0, color='red')
 
     ax.axis('scaled')
     scale = np.max(X[0, 1:4, 0])
@@ -82,8 +82,11 @@ def plot3d(X_in, U_in):
 
 
 if __name__ == "__main__":
+    import os
 
-    X_in = np.load("trajectory/all/X.npy")
-    U_in = np.load("trajectory/all/U.npy")
+    folder_number = str(int(max(os.listdir('trajectory/all/')))).zfill(3)
+
+    X_in = np.load(f"trajectory/all/{folder_number}/X.npy")
+    U_in = np.load(f"trajectory/all/{folder_number}/U.npy")
 
     plot3d(X_in, U_in)

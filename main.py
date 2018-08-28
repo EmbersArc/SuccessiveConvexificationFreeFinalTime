@@ -8,6 +8,13 @@ from visualization.plot3d import plot3d
 from scproblem import SCProblem
 from utils import format_line, save_arrays
 
+"""
+Python implementation of 'Successive Convexification for 6-DoF Mars Rocket Powered Landing with Free-Final-Time' paper
+by Michael Szmuk and Behçet Açıkmeşe.
+
+Implementation by Sven Niederberger (s-niederberger@outlook.com)
+"""
+
 m = Model_6DoF()
 
 # state and input
@@ -40,67 +47,32 @@ for it in range(iterations):
 
     problem.set_parameters(A_bar=A_bar, B_bar=B_bar, C_bar=C_bar, S_bar=S_bar, z_bar=z_bar,
                            X_last=X, U_last=U, sigma_last=sigma,
-                           radius_trust_region=tr_radius,
-                           weight_sigma=w_sigma, weight_nu=w_nu)
+                           weight_sigma=w_sigma, weight_nu=w_nu, weight_delta=w_delta)
 
     while True:
-        info = problem.solve(verbose=False, solver=solver)
+        info = problem.solve(verbose=verbose_solver, solver=solver)
         print(format_line('Solver Error', info['solver_error']))
 
-        # get solution
-        new_X = problem.get_variable('X')
-        new_U = problem.get_variable('U')
-        new_sigma = problem.get_variable('sigma')
+        X = problem.get_variable('X')
+        U = problem.get_variable('U')
+        sigma = problem.get_variable('sigma')
 
-        linear_cost = np.linalg.norm(problem.get_variable('nu'), 1)
-        nonlinear_cost = np.linalg.norm(new_X - integrator.integrate_nonlinear_piecewise(new_X, new_U, new_sigma), 1)
+        delta_norm = problem.get_variable('delta_norm')
+        sigma_norm = problem.get_variable('sigma_norm')
+        nu_norm = np.linalg.norm(problem.get_variable('nu'), np.inf)
 
-        if last_linear_cost is None:
-            last_linear_cost = linear_cost
-            X = new_X
-            U = new_U
-            sigma = new_sigma
-            break
+        print(format_line('delta_norm', delta_norm))
+        print(format_line('sigma_norm', sigma_norm))
+        print(format_line('nu_norm', nu_norm))
 
-        actual_change = last_linear_cost - linear_cost
-        predicted_change = last_linear_cost - nonlinear_cost
-
-        print('')
-        print(format_line('Virtual Control Cost', linear_cost))
-        print(format_line('Total Time', sigma, 's'))
-        print('')
-        print(format_line('Actual change', actual_change))
-        print(format_line('Predicted change', predicted_change))
-        print('')
-
-        if abs(predicted_change) < 1e-10:
+        if delta_norm < 1e-3 and sigma_norm < 1e-3 and nu_norm < 1e-7:
             converged = True
-            break
-        else:
-            rho = actual_change / predicted_change
-            if rho < rho_0:
-                # reject
-                tr_radius /= alpha
-                print(f'Trust region too large. Solving again with radius={tr_radius}')
-            else:
-                # accept
-                X = new_X
-                U = new_U
-                sigma = new_sigma
 
-                if rho < rho_1:
-                    print('Decreasing radius.')
-                    tr_radius /= alpha
-                elif rho >= rho_2:
-                    print('Increasing radius.')
-                    tr_radius *= beta
+        w_delta *= 1.5
 
-                last_linear_cost = linear_cost
-                break
+        problem.set_parameters(weight_delta=w_delta)
 
-        problem.set_parameters(radius_trust_region=tr_radius)
-
-        print('-' * 50)
+        break
 
     print('')
     print(format_line('Time for iteration', time() - t0_it, 's'))
@@ -117,7 +89,6 @@ all_X = np.stack(all_X)
 all_U = np.stack(all_U)
 
 # save trajectory to file for visualization
-save_arrays('visualization/trajectory/final/', {'X': m.x_redim(X), 'U': m.u_redim(U), 'sigma': sigma})
 save_arrays('visualization/trajectory/all/', {'X': all_X, 'U': all_U, 'sigma': sigma})
 
 # plot trajectory

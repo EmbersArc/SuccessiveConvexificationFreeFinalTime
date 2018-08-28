@@ -41,14 +41,14 @@ class Model_6DoF:
     m_dry = 1.  # 22000 kg
 
     # Flight time guess
-    t_f_guess = 7.  # 10 s
+    t_f_guess = 5.  # 10 s
 
     # Vector from thrust point to CoM
     r_T_B = np.array([-1e-2, 0., 0.])  # -20 m
 
     # State constraints
-    r_I_init = np.array((4., 0., 2.))  # 2000 m, 200 m, 200 m
-    v_I_init = np.array([0., -2., 0.])  # -300 m/s, 50 m/s, 50 m/s
+    r_I_init = np.array((4., 4., 0))  # 2000 m, 200 m, 200 m
+    v_I_init = np.array([0., 0., 2.])  # -300 m/s, 50 m/s, 50 m/s
     q_B_I_init = euler_to_quat((0, 0, 0))
     w_B_init = np.array((0., 0., 0.))
 
@@ -66,7 +66,7 @@ class Model_6DoF:
 
     # Thrust limits
     T_max = 5.  # 800000 [kg*m/s^2]
-    T_min = T_max * 0.1
+    T_min = T_max * 0.06
 
     # Angular moment of inertia
     J_B = 1e-2 * np.diag([1., 1., 1.])  # 100000 [kg*m^2], 4000000 [kg*m^2], 4000000 [kg*m^2]
@@ -75,14 +75,14 @@ class Model_6DoF:
     g_I = np.array((-1, 0., 0.))  # -9.81 [m/s^2]
 
     # Fuel consumption
-    alpha_m = 0.002  # 1 / (282 * 9.81) [s/m]
+    alpha_m = 0.01  # 1 / (282 * 9.81) [s/m]
 
     def set_random_initial_state(self):
-        self.r_I_init[0] = np.random.uniform(4, 5)
-        self.r_I_init[1:3] = np.random.uniform(-2, 2, size=2)
+        self.r_I_init[0] = np.random.uniform(0.5, 1)
+        self.r_I_init[1:3] = np.random.uniform(-0.2, 0.2, size=2)
 
-        self.v_I_init[0] = np.random.uniform(-0.2, -0.1)
-        self.v_I_init[1:3] = np.random.uniform(-1, 1, size=2)
+        self.v_I_init[0] = np.random.uniform(-0.1, -0.05)
+        self.v_I_init[1:3] = np.random.uniform(-0.2, 0.2, size=2)
 
         self.q_B_I_init = np.array(euler_to_quat((0,
                                                   -np.random.uniform(0, 20) * self.r_I_init[1],
@@ -104,7 +104,7 @@ class Model_6DoF:
         self.r_scale = np.linalg.norm(self.r_I_init)
         self.m_scale = self.m_wet
 
-        self.nondimensionalize()
+        # self.nondimensionalize()
 
     def nondimensionalize(self):
         """ nondimensionalize all parameters and boundaries """
@@ -249,7 +249,7 @@ class Model_6DoF:
             X_v[0, 0] == self.x_init[0],
             X_v[1:4, 0] == self.x_init[1:4],
             X_v[4:7, 0] == self.x_init[4:7],
-            X_v[7:11, 0] == self.x_init[7:11],
+            # X_v[7:11, 0] == self.x_init[7:11],
             X_v[11:14, 0] == self.x_init[11:14],
 
             # X_[0, -1] == self.x_final[0], # final mass is free
@@ -267,13 +267,13 @@ class Model_6DoF:
             # Control constraints:
             cvx.norm(U_v[1:3, :], axis=0) <= self.tan_delta_max * U_v[0, :],  # gimbal angle constraint
             cvx.norm(U_v, axis=0) <= self.T_max,  # upper thrust constraint
-            U_v[0, :] >= self.T_min  # simple lower thrust constraint
+            # U_v[0, :] >= self.T_min  # simple lower thrust constraint
         ]
 
-        # # linearized lower thrust constraint
-        # rhs = [U_last_p[:, k] / cvx.norm(U_last_p[:, k]) * U_v[:, k] for k in range(X_v.shape[1])]
-        # constraints += [
-        #     self.T_min <= cvx.vstack(rhs)
-        # ]
+        # linearized lower thrust constraint
+        rhs = [U_last_p[:, k] / cvx.norm(U_last_p[:, k]) * U_v[:, k] for k in range(X_v.shape[1])]
+        constraints += [
+            self.T_min <= cvx.vstack(rhs)
+        ]
 
         return constraints

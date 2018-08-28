@@ -3,7 +3,7 @@ import cvxpy as cvx
 
 class SCProblem:
     """
-    Defines a standard Successive Convexification problem for a given model.
+    Defines a standard Successive Convexification problem and adds the model specific constraints and objectives.
 
     :param m: The model object
     :param K: Number of discretization points
@@ -16,6 +16,8 @@ class SCProblem:
         self.var['U'] = cvx.Variable((m.n_u, K))
         self.var['sigma'] = cvx.Variable()
         self.var['nu'] = cvx.Variable((m.n_x, K - 1))
+        self.var['delta_norm'] = cvx.Variable(nonneg=True)
+        self.var['sigma_norm'] = cvx.Variable(nonneg=True)
 
         # Parameters:
         self.par = dict()
@@ -30,8 +32,8 @@ class SCProblem:
         self.par['sigma_last'] = cvx.Parameter(nonneg=True)
 
         self.par['weight_sigma'] = cvx.Parameter(nonneg=True)
+        self.par['weight_delta'] = cvx.Parameter(nonneg=True)
         self.par['weight_nu'] = cvx.Parameter(nonneg=True)
-        self.par['radius_trust_region'] = cvx.Parameter(nonneg=True)
 
         # Constraints:
         constraints = []
@@ -52,12 +54,11 @@ class SCProblem:
         ]
 
         # Trust regions:
-        dx = self.var['X'] - self.par['X_last']
-        du = self.var['U'] - self.par['U_last']
+        dx = cvx.sum(cvx.square(self.var['X'] - self.par['X_last']), axis=0)
+        du = cvx.sum(cvx.square(self.var['U'] - self.par['U_last']), axis=0)
         ds = self.var['sigma'] - self.par['sigma_last']
-        constraints += [cvx.norm(dx, 1) <= self.par['radius_trust_region']]
-        constraints += [cvx.norm(du, 1) <= self.par['radius_trust_region']]
-        constraints += [cvx.norm(ds, 1) <= self.par['radius_trust_region']]
+        constraints += [cvx.norm(dx + du, 1) <= self.var['delta_norm']]
+        constraints += [cvx.norm(ds, 'inf') <= self.var['sigma_norm']]
 
         # Flight time positive:
         constraints += [self.var['sigma'] >= 0.1]
@@ -65,11 +66,13 @@ class SCProblem:
         # Objective:
         model_objective = m.get_objective(self.var['X'], self.var['U'], self.par['X_last'], self.par['U_last'])
         sc_objective = cvx.Minimize(
-            self.par['weight_sigma'] * self.var['sigma'] + self.par['weight_nu'] * cvx.norm(self.var['nu'], 1)
+            self.par['weight_sigma'] * self.var['sigma']
+            + self.par['weight_nu'] * cvx.norm(self.var['nu'], 'inf')
+            + self.par['weight_delta'] * self.var['delta_norm']
+            + self.par['weight_delta'] * self.var['sigma_norm']
         )
-        objective = sc_objective
-        if model_objective is not None:
-            objective += model_objective
+
+        objective = sc_objective if model_objective is None else sc_objective + model_objective
 
         self.prob = cvx.Problem(objective, constraints)
 

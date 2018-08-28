@@ -1,22 +1,13 @@
 # Trajectory points
-K = 30
+K = 50
 
 # Max solver iterations
-iterations = 20
+iterations = 30
 
 # Weight constants
-# flight time
-w_sigma = 1
-# virtual control
-w_nu = 1e5
-
-# initial trust region radius
-tr_radius = 1
-# trust region variables
-rho_0 = 0.0
-rho_1 = 0.25
-rho_2 = 0.9
-alpha = 2.0
-beta = 3.2
+w_sigma = 1e-1  # difference in flight time
+w_delta = 1e-3  # difference in state/input
+w_nu = 1e5  # virtual control
 
 solver = ['ECOS', 'MOSEK'][0]
+verbose_solver = False
