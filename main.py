@@ -48,7 +48,7 @@ for it in range(iterations):
 
     problem.set_parameters(A_bar=A_bar, B_bar=B_bar, C_bar=C_bar, S_bar=S_bar, z_bar=z_bar,
                            X_last=X, U_last=U, sigma_last=sigma,
-                           weight_sigma=w_sigma, weight_nu=w_nu, weight_delta=w_delta)
+                           weight_sigma=w_sigma, weight_nu=w_nu, weight_delta=w_delta, weight_delta_sigma=w_delta_sigma)
 
     while True:
         info = problem.solve(verbose=verbose_solver, solver=solver)

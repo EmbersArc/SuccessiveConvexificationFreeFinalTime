@@ -33,6 +33,7 @@ class SCProblem:
 
         self.par['weight_sigma'] = cvx.Parameter(nonneg=True)
         self.par['weight_delta'] = cvx.Parameter(nonneg=True)
+        self.par['weight_delta_sigma'] = cvx.Parameter(nonneg=True)
         self.par['weight_nu'] = cvx.Parameter(nonneg=True)
 
         # Constraints:
@@ -69,7 +70,7 @@ class SCProblem:
             self.par['weight_sigma'] * self.var['sigma']
             + self.par['weight_nu'] * cvx.norm(self.var['nu'], 'inf')
             + self.par['weight_delta'] * self.var['delta_norm']
-            + self.par['weight_delta'] * self.var['sigma_norm']
+            + self.par['weight_delta_sigma'] * self.var['sigma_norm']
         )
 
         objective = sc_objective if model_objective is None else sc_objective + model_objective
