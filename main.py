@@ -4,7 +4,7 @@ import numpy as np
 from model_6dof import Model_6DoF
 from parameters import *
 from discretization import Integrator
-from visualization.plot3d import plot3d
+from visualization.model_6dof_plot import plot3d
 from scproblem import SCProblem
 from utils import format_line, save_arrays
 
