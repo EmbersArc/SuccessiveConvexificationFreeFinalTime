@@ -1,12 +1,13 @@
 from time import time
 import numpy as np
 
-from model_6dof import Model_6DoF
 from parameters import *
 from discretization import Integrator
-from visualization.model_6dof_plot import plot3d
 from scproblem import SCProblem
 from utils import format_line, save_arrays
+
+from models.model_6dof import Model_6DoF
+from models.model_6dof_plot import plot3d
 
 """
 Python implementation of 'Successive Convexification for 6-DoF Mars Rocket Powered Landing with Free-Final-Time' paper
@@ -89,7 +90,7 @@ all_X = np.stack(all_X)
 all_U = np.stack(all_U)
 
 # save trajectory to file for visualization
-save_arrays('visualization/trajectory/all/', {'X': all_X, 'U': all_U, 'sigma': sigma})
+save_arrays('output/trajectory/', {'X': all_X, 'U': all_U, 'sigma': sigma})
 
 # plot trajectory
 plot3d(all_X, all_U)

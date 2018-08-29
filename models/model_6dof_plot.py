@@ -84,9 +84,9 @@ def plot3d(X_in, U_in):
 if __name__ == "__main__":
     import os
 
-    folder_number = str(int(max(os.listdir('trajectory/all/')))).zfill(3)
+    folder_number = str(int(max(os.listdir('output/trajectory/')))).zfill(3)
 
-    X_in = np.load(f"trajectory/all/{folder_number}/X.npy")
-    U_in = np.load(f"trajectory/all/{folder_number}/U.npy")
+    X_in = np.load(f"output/trajectory/{folder_number}/X.npy")
+    U_in = np.load(f"output/trajectory/{folder_number}/U.npy")
 
     plot3d(X_in, U_in)
