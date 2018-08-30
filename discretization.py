@@ -72,10 +72,10 @@ class Integrator:
         :param sigma: Total time
         :return: Derivative at current time and state dVdt
         """
-        alpha = t / self.dt
-        beta = 1. - alpha
+        alpha = (self.dt - t) / self.dt
+        beta = t / self.dt
         x = V[self.x_ind]
-        u = u_t0 + alpha * (u_t1 - u_t0)
+        u = u_t0 + beta * (u_t1 - u_t0)
 
         # using \Phi_A(\tau_{k+1},\xi) = \Phi_A(\tau_{k+1},\tau_k)\Phi_A(\xi,\tau_k)^{-1}
         # and pre-multiplying with \Phi_A(\tau_{k+1},\tau_k) after integration
@@ -124,7 +124,8 @@ class Integrator:
         X_nl[:, 0] = x0
 
         for k in range(self.K - 1):
-            X_nl[:, k + 1] = odeint(self._dx, X_nl[:, k], (0, self.dt * sigma), args=(U[:, k], U[:, k + 1], sigma))[1, :]
+            X_nl[:, k + 1] = odeint(self._dx, X_nl[:, k], (0, self.dt * sigma), args=(U[:, k], U[:, k + 1], sigma))[1,
+                             :]
 
         return X_nl
 
