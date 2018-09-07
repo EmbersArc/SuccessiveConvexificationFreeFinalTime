@@ -14,7 +14,7 @@ class SCProblem:
         self.var = dict()
         self.var['X'] = cvx.Variable((m.n_x, K))
         self.var['U'] = cvx.Variable((m.n_u, K))
-        self.var['sigma'] = cvx.Variable()
+        self.var['sigma'] = cvx.Variable(nonneg=True)
         self.var['nu'] = cvx.Variable((m.n_x, K - 1))
         self.var['delta_norm'] = cvx.Variable(nonneg=True)
         self.var['sigma_norm'] = cvx.Variable(nonneg=True)
