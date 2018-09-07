@@ -41,52 +41,59 @@ class Model_6DoF:
     m_dry = 1.  # 22000 kg
 
     # Flight time guess
-    t_f_guess = 5.  # 10 s
-
-    # Vector from thrust point to CoM
-    r_T_B = np.array([-1e-2, 0., 0.])  # -20 m
+    t_f_guess = 3.  # 10 s
 
     # State constraints
-    r_I_init = np.array((4., 4., 0))  # 2000 m, 200 m, 200 m
-    v_I_init = np.array([0., 0., 2.])  # -300 m/s, 50 m/s, 50 m/s
+    r_I_init = np.array((4., 4., 0.))
+    v_I_init = np.array((0., -1., -2.))
     q_B_I_init = euler_to_quat((0, 0, 0))
-    w_B_init = np.array((0., 0., 0.))
+    w_B_init = np.deg2rad(np.array((0., 0., 0.)))
 
     r_I_final = np.array((0., 0., 0.))
     v_I_final = np.array((-1e-1, 0., 0.))
     q_B_I_final = euler_to_quat((0, 0, 0))
-    w_B_final = np.array((0., 0., 0.))
+    w_B_final = np.deg2rad(np.array((0., 0., 0.)))
 
     w_B_max = np.deg2rad(60)
 
     # Angles
-    tan_delta_max = np.tan(np.deg2rad(20))
-    cos_theta_max = np.cos(np.deg2rad(90))
-    tan_gamma_gs = np.tan(np.deg2rad(20))
+    max_gimbal = 20
+    max_angle = 90
+    glidelslope_angle = 20
+
+    tan_delta_max = np.tan(np.deg2rad(max_gimbal))
+    cos_theta_max = np.cos(np.deg2rad(max_angle))
+    tan_gamma_gs = np.tan(np.deg2rad(glidelslope_angle))
 
     # Thrust limits
-    T_max = 5.  # 800000 [kg*m/s^2]
-    T_min = T_max * 0.06
+    T_max = 5.
+    T_min = 0.3
 
     # Angular moment of inertia
-    J_B = 1e-2 * np.diag([1., 1., 1.])  # 100000 [kg*m^2], 4000000 [kg*m^2], 4000000 [kg*m^2]
+    J_B = 1e-2 * np.diag([1., 1., 1.])
 
     # Gravity
-    g_I = np.array((-1, 0., 0.))  # -9.81 [m/s^2]
+    g_I = np.array((-1, 0., 0.))
 
     # Fuel consumption
-    alpha_m = 0.01  # 1 / (282 * 9.81) [s/m]
+    alpha_m = 0.01
+
+    # Vector from thrust point to CoM
+    r_T_B = np.array([-1e-2, 0., 0.])
 
     def set_random_initial_state(self):
-        self.r_I_init[0] = np.random.uniform(0.5, 1)
-        self.r_I_init[1:3] = np.random.uniform(-0.2, 0.2, size=2)
+        self.r_I_init[0] = np.random.uniform(3, 4)
+        self.r_I_init[1:3] = np.random.uniform(-2, 2, size=2)
 
-        self.v_I_init[0] = np.random.uniform(-0.1, -0.05)
-        self.v_I_init[1:3] = np.random.uniform(-0.2, 0.2, size=2)
+        self.v_I_init[0] = np.random.uniform(-1, -0.5)
+        self.v_I_init[1:3] = np.random.uniform(-0.5, -0.2, size=2) * self.r_I_init[1:3]
 
-        self.q_B_I_init = np.array(euler_to_quat((0,
-                                                  -np.random.uniform(0, 20) * self.r_I_init[1],
-                                                  -np.random.uniform(0, 20) * self.r_I_init[2])))
+        self.q_B_I_init = euler_to_quat((0,
+                                         np.random.uniform(-30, 30),
+                                         np.random.uniform(-30, 30)))
+        self.w_B_init = np.deg2rad((0,
+                                    np.random.uniform(-20, 20),
+                                    np.random.uniform(-20, 20)))
 
     # ------------------------------------------ Start normalization stuff
     def __init__(self):
@@ -109,10 +116,10 @@ class Model_6DoF:
     def nondimensionalize(self):
         """ nondimensionalize all parameters and boundaries """
 
-        self.alpha_m *= self.r_scale  # s
-        self.r_T_B /= self.r_scale  # 1
-        self.g_I /= self.r_scale  # 1/s^2
-        self.J_B /= (self.m_scale * self.r_scale ** 2)  # 1
+        self.alpha_m *= self.r_scale
+        self.r_T_B /= self.r_scale
+        self.g_I /= self.r_scale
+        self.J_B /= (self.m_scale * self.r_scale ** 2)
 
         self.x_init = self.x_nondim(self.x_init)
         self.x_final = self.x_nondim(self.x_final)
@@ -139,7 +146,7 @@ class Model_6DoF:
     def redimensionalize(self):
         """ redimensionalize all parameters """
 
-        self.alpha_m /= self.r_scale  # s/m * m/Ul = s/Ul
+        self.alpha_m /= self.r_scale
         self.r_T_B *= self.r_scale
         self.g_I *= self.r_scale
         self.J_B *= (self.m_scale * self.r_scale ** 2)
@@ -162,7 +169,6 @@ class Model_6DoF:
     def u_redim(self, u):
         """ redimensionalize u """
         return u * (self.m_scale * self.r_scale)
-
     # ------------------------------------------ End normalization stuff
 
     def get_equations(self):
@@ -187,8 +193,9 @@ class Model_6DoF:
         f[7:11, 0] = 1 / 2 * omega(x[11:14, 0]) * x[7: 11, 0]
         f[11:14, 0] = J_B ** -1 * (skew(r_T_B) * u - skew(x[11:14, 0]) * J_B * x[11:14, 0])
 
-        A = f.jacobian(x)
-        B = f.jacobian(u)
+        f = sp.simplify(f)
+        A = sp.simplify(f.jacobian(x))
+        B = sp.simplify(f.jacobian(u))
 
         f_func = sp.lambdify((x, u), f, 'numpy')
         A_func = sp.lambdify((x, u), A, 'numpy')
@@ -231,8 +238,9 @@ class Model_6DoF:
         :param U_last_p: cvx parameter for last inputs
         :return: A cvx objective function.
         """
-        # objective = cvx.Minimize(100 * cvx.norm(X_v[2:4, -1]))
-        return None
+        objective = None
+
+        return objective
 
     def get_constraints(self, X_v, U_v, X_last_p, U_last_p):
         """
@@ -249,7 +257,7 @@ class Model_6DoF:
             X_v[0, 0] == self.x_init[0],
             X_v[1:4, 0] == self.x_init[1:4],
             X_v[4:7, 0] == self.x_init[4:7],
-            # X_v[7:11, 0] == self.x_init[7:11],
+            # X_v[7:11, 0] == self.x_init[7:11],  # initial orientation is free
             X_v[11:14, 0] == self.x_init[11:14],
 
             # X_[0, -1] == self.x_final[0], # final mass is free

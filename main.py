@@ -65,6 +65,8 @@ for it in range(iterations):
         print(format_line('delta_norm', delta_norm))
         print(format_line('sigma_norm', sigma_norm))
         print(format_line('nu_norm', nu_norm))
+        
+        print(format_line('flight time', sigma))
 
         if delta_norm < 1e-3 and sigma_norm < 1e-3 and nu_norm < 1e-7:
             converged = True
