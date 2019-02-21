@@ -5,4 +5,4 @@ Implementation of [Successive Convexification for 6-DoF Mars Rocket Powered Land
 
 Reqires `matplotlib`, `numpy`, `scipy` and `cvxpy`.
 
-[C++ implementation WIP](https://github.com/EmbersArc/SuccessiveConvexificationCpp)
+[C++ implementation](https://github.com/EmbersArc/SuccessiveConvexificationCpp)
